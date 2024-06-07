@@ -64,7 +64,15 @@ public:
             m_template_env->GetSettings().lstripBlocks = true;
             m_template_env->GetSettings().trimBlocks = true;
             m_processed_chat_template = std::make_unique<jinja2::Template>(m_template_env.get());
-            m_processed_chat_template->Load(m_chat_template);
+            //auto result = m_processed_chat_template->Load(m_chat_template);
+            // the modified template
+            auto result = m_processed_chat_template->LoadFromFile("/workspace/openvino.genai/text_generation/templates/llama2.j2");
+            if (!result) {
+                std::cerr << "Error loading the template: [" << result.error().ToString() << "]" << std::endl;
+                exit(1);
+            } else {
+                std::cout << "Template loaded." << std::endl;
+            }
         }
     }
 
@@ -100,14 +108,26 @@ public:
                 std::string prompt = m["content"];
                 jinja2::ValuesMap message {{"role", role}, {"content", prompt}};
                 valuesList.emplace_back(message);
+                std::cout << "Pushing: role;" << role << ", prompt;" << prompt << std::endl;
             }
+                std::cout << "Pushing: bos_token;[" << m_bos_token << "], eos_token;[" << m_eos_token << "]" << std::endl;
             jinja2::ValuesMap params = {
                 {"messages", valuesList},
                 {"bos_token",  m_bos_token},
                 {"eos_token", m_eos_token},
                 {"add_generation_prompt", true},
             };
-            std::string text = m_processed_chat_template->RenderAsString(params).value();
+            std::cout << "Before RenderAsString..." << std::endl;
+            auto result = m_processed_chat_template->RenderAsString(params);
+            std::cout << "Before value()..." << std::endl;
+            if (!result.has_value()) {
+                std::cerr << "Error: " << result.error() << std::endl;
+                exit(1);
+            } else {
+                std::cout << "Success rendering as string" << std::endl;
+            }
+            std::string text = result.value();
+            std::cout << "After RenderAsString..." << std::endl;
             return text;
         } catch (const std::exception& error) {
             throw std::runtime_error(std::string("Error during applying chat template: ") + error.what());

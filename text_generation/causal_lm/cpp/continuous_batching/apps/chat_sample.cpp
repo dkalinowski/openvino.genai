@@ -7,7 +7,7 @@
 #include "continuous_batching_pipeline.hpp"
 #include "tokenizer.hpp"
 
-int main(int argc, char* argv[]) try {
+int main(int argc, char* argv[]) {//try {
     // Command line options
 
     cxxopts::Options options("chat_sample", "Help command");
@@ -57,10 +57,24 @@ int main(int argc, char* argv[]) try {
     entry.emplace("content", "Who are you?");
     sample_chat.push_back(entry);
 
+    entry.clear();
+    entry.emplace("role", "assistant");
+    entry.emplace("content", R"(Arrrr, shiver me timbers! 'Tis a fine day to be havin' a chat with ye, matey! Me name be Captain Blackbeak, the most feared and infamous pirate to ever sail the seven seas! *adjusts eye patch*
+
+So, what be bringin' ye to these waters? Are ye here to plunder some booty or just to share a pint o' grog with a scurvy dog like meself? *winks*tell me about your ship, the Black Swan. What makes it so special?)");
+    sample_chat.push_back(entry);
+
+    entry.clear();
+    entry.emplace("role", "user");
+    entry.emplace("content", "My ship is full of goods, how about yours?");
+    sample_chat.push_back(entry);
+
     ContinuousBatchingPipeline pipe(models_path, scheduler_config);
+    std::cout << "Applying template..." << std::endl;
     std::string prompt = pipe.get_tokenizer()->apply_chat_template(sample_chat);
-    std::cout << "Input prompt: \n" << prompt << std::endl;
-    
+    std::cout << "Input prompt: \n[" << prompt << "]" << std::endl;
+    //exit(1);
+
     auto input_tensor = pipe.get_tokenizer()->encode(prompt);
     std::vector<int64_t> input_tokens(input_tensor.data<int64_t>(), input_tensor.data<int64_t>() + input_tensor.get_size());
 
@@ -71,18 +85,25 @@ int main(int argc, char* argv[]) try {
     std::cout << std::endl;
 
     GenerationConfig sampling_params = GenerationConfig::greedy();
+    sampling_params.max_new_tokens = 100;
+    sampling_params.ignore_eos = false;
     auto results = pipe.generate(std::vector<std::string>{prompt}, std::vector<GenerationConfig>{sampling_params});
     if (results[0].m_status != GenerationStatus::FINISHED)
         std::cout << "Generation not finished properly" << std::endl;
     else
         std::cout << "Model response: " << results[0].m_generation_ids[0] << std::endl;
 
+
+    // Model response: Arrrr, me hearty! *chuckles* Me ship, the Black Swan, be full o' treasure, indeed! *adjusts eye patch* But I be havin' somethin'
+    // even more valuable than gold doubloons or shiny pieces o' silver. *winks* I be havin' me trusty parrot, Polly! She be the best navigator and 
+    // lookout a pirate could ask for! *pets
+
     // For now this sample is used to check template processing. 
     // Ultimately we could make it a full, interactive chat sample. 
-} catch (const std::exception& error) {
-    std::cerr << "Error: " << error.what() << '\n';
-    return EXIT_FAILURE;
-} catch (...) {
-    std::cerr << "Non-exception object thrown\n";
-    return EXIT_FAILURE;
+// } catch (const std::exception& error) {
+//     std::cerr << "Error: " << error.what() << '\n';
+//     return EXIT_FAILURE;
+// } catch (...) {
+//     std::cerr << "Non-exception object thrown\n";
+//     return EXIT_FAILURE;
 }
