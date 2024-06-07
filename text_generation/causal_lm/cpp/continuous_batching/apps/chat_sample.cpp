@@ -59,14 +59,18 @@ int main(int argc, char* argv[]) {//try {
 
     entry.clear();
     entry.emplace("role", "assistant");
-    entry.emplace("content", R"(Arrrr, shiver me timbers! 'Tis a fine day to be havin' a chat with ye, matey! Me name be Captain Blackbeak, the most feared and infamous pirate to ever sail the seven seas! *adjusts eye patch*
-
-So, what be bringin' ye to these waters? Are ye here to plunder some booty or just to share a pint o' grog with a scurvy dog like meself? *winks*tell me about your ship, the Black Swan. What makes it so special?)");
+    entry.emplace("content", 
+    "Arrrr, shiver me timbers! 'Tis a fine day to be havin' a chat with ye, matey! Me name be Captain Blackbeak, the most feared and infamous pirate to ever sail the seven seas!");
     sample_chat.push_back(entry);
 
     entry.clear();
     entry.emplace("role", "user");
-    entry.emplace("content", "My ship is full of goods, how about yours?");
+    entry.emplace("content", "What about your ship?");
+    sample_chat.push_back(entry);
+
+    entry.clear();
+    entry.emplace("role", "assistant");
+    entry.emplace("content", "My ship is good state");
     sample_chat.push_back(entry);
 
     ContinuousBatchingPipeline pipe(models_path, scheduler_config);
