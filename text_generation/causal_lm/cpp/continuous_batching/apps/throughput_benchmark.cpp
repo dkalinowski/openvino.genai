@@ -87,7 +87,8 @@ Dataset filtered_dataset(const std::string& models_path, const std::string& data
     OPENVINO_ASSERT(json_file.is_open(), "Cannot open dataset file");
 
     // from vLLM tput benchmark
-    const float dataset_size_coeff = 1.2f;
+    //const float dataset_size_coeff = 1.2f;
+    const float dataset_size_coeff = 1.0f;  // it's obvious we CANNOT take 20% more prompts than specified N if we really want to have the same number of input tokens
 
     nlohmann::json json_dataset = nlohmann::json::parse(json_file);
     Dataset sampled_dataset, dataset;
@@ -97,6 +98,7 @@ Dataset filtered_dataset(const std::string& models_path, const std::string& data
 
     Tokenizer tokenizer(models_path);
 
+    int i = 1;
     for (auto json_data_iterator = json_dataset.begin(); json_data_iterator != json_dataset.end() && dataset.size() < num_prompt_candidates; ++json_data_iterator) {
         auto & json_data = *json_data_iterator;
 
@@ -127,6 +129,10 @@ Dataset filtered_dataset(const std::string& models_path, const std::string& data
         dataset.push_data(human_question, greedy_search);
         dataset.push_lens(input_len, output_len);
     }
+
+    return dataset;
+
+    // No, we do not want to randomize the batch order
 
     // sample dataset
     srand(42);
@@ -250,6 +256,8 @@ public:
     }
 
     void add_generation(ContinuousBatchingPipeline* pipe, Dataset* dataset, size_t request_id) {
+        // Log generation and first 12 letters of the prompt
+        std::cout << "Adding prompt[" << request_id <<"]: [" << dataset->m_prompts[request_id].substr(0, std::min(dataset->m_prompts[request_id].size(), (size_t)12)) << "...]" << std::endl;
         GenerationHandle generation_handle = pipe->add_request(request_id, dataset->m_prompts[request_id], dataset->m_sampling_params[request_id]);
         std::lock_guard<std::mutex> lock(mutex);
         generations_info.emplace_back(std::move(generation_handle), dataset->m_input_lens[request_id]);

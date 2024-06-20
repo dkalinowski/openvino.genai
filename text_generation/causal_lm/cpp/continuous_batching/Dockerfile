@@ -4,9 +4,9 @@ ARG JOBS
 WORKDIR /workspace
 RUN apt-get update -y && apt-get install -y python3-pip python3-venv git
 
-# Install OpenVINO
+# Install OpenVINO (version matches current OVMS main)
 RUN git clone --branch master https://github.com/openvinotoolkit/openvino.git && \
-    cd /workspace/openvino && git reset --hard 0e7313e54408ae09b4fce52dfa2c688a6b42593a && \
+    cd /workspace/openvino && git reset --hard 5c0f38f83f62fdabcdc980fa6dc3ed1ea16c8a05 && \
     git submodule update --init -- /workspace/openvino/thirdparty/xbyak /workspace/openvino/thirdparty/pugixml /workspace/openvino/thirdparty/open_model_zoo \
         /workspace/openvino/thirdparty/protobuf /workspace/openvino/thirdparty/snappy /workspace/openvino/thirdparty/telemetry /workspace/openvino/src/plugins/intel_cpu/thirdparty/mlas \
         /workspace/openvino/src/plugins/intel_cpu/thirdparty/onednn /workspace/openvino/src/bindings/python/thirdparty/pybind11 && cd -
