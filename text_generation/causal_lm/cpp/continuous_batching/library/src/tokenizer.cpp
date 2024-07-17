@@ -117,7 +117,7 @@ public:
 
         // tokenizer and detokenizer work on CPU only
         std::map<std::string, ov::Any> pluginConfig;
-        pluginConfig["PERFORMANCE_HINT"] = "THROUGHPUT";
+        pluginConfig["PERFORMANCE_HINT"] = "LATENCY";
 
         m_tokenizer = core.compile_model(
             tokenizer_model, "CPU", pluginConfig);
