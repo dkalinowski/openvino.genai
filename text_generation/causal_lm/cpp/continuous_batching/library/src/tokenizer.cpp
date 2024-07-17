@@ -10,6 +10,7 @@
 #include "openvino/runtime/core.hpp"
 
 #include "tokenizer.hpp"
+#include "timer.hpp"
 
 // From OVMS
 template <typename T>
@@ -112,11 +113,14 @@ public:
         OPENVINO_ASSERT(rt_info.find("eos_token_id") != rt_info.end(), "Failed to detect \"eos_token_id\" in openvino_tokenizer.xml runtime information");
         m_eos_token_id = rt_info.at("eos_token_id").as<int64_t>();
 
-        const size_t INFER_REQUEST_QUEUE_SIZE = 32;
+        const size_t INFER_REQUEST_QUEUE_SIZE = 256;
 
         // tokenizer and detokenizer work on CPU only
+        std::map<std::string, ov::Any> pluginConfig;
+        pluginConfig["PERFORMANCE_HINT"] = "THROUGHPUT";
+
         m_tokenizer = core.compile_model(
-            tokenizer_model, "CPU");
+            tokenizer_model, "CPU", pluginConfig);
         m_ireq_queue_tokenizer = std::make_unique<Queue<ov::InferRequest>>(
             INFER_REQUEST_QUEUE_SIZE,
             [this]() -> ov::InferRequest {
@@ -124,7 +128,7 @@ public:
             });
 
         m_detokenizer = core.compile_model(
-            models_path + "/openvino_detokenizer.xml", "CPU");
+            models_path + "/openvino_detokenizer.xml", "CPU", pluginConfig);
         m_ireq_queue_detokenizer = std::make_unique<Queue<ov::InferRequest>>(
             INFER_REQUEST_QUEUE_SIZE,
             [this]() -> ov::InferRequest {
@@ -133,6 +137,8 @@ public:
     }
 
     ov::Tensor encode(std::string prompt) {
+        static ManualTimer timer("tokenize encode");
+        timer.start();
         QueueAccessGuard<ov::InferRequest> guard(*m_ireq_queue_tokenizer);
         auto& ireq = guard.get();
         ireq.set_input_tensor(ov::Tensor{ov::element::string, {TOKENIZER_BATCH_SIZE}, &prompt});
@@ -140,15 +146,20 @@ public:
         ov::Tensor tmp_tensor = ireq.get_tensor("input_ids");
         ov::Tensor output_tensor(tmp_tensor.get_element_type(), tmp_tensor.get_shape());
         tmp_tensor.copy_to(output_tensor);
-        return output_tensor;
+        timer.end();
+        return std::move(output_tensor);
     }
 
     std::string decode(std::vector<int64_t> tokens) {
+        static ManualTimer timer("tokenize decode");
+        timer.start();
         QueueAccessGuard<ov::InferRequest> guard(*m_ireq_queue_detokenizer);
         auto& ireq = guard.get();
         ireq.set_input_tensor(ov::Tensor{ov::element::i64, {TOKENIZER_BATCH_SIZE, tokens.size()}, tokens.data()});
         ireq.infer();
-        return ireq.get_output_tensor().data<std::string>()[0];
+        std::string out = ireq.get_output_tensor().data<std::string>()[0];
+        timer.end();
+        return std::move(out);
     }
 
     size_t get_eos_token_id() const {

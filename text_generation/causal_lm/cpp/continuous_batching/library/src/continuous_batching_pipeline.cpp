@@ -121,10 +121,10 @@ public:
 
         ov::Tensor input_ids;
         {
-            static ManualTimer timer("tokenize");
-            timer.start();
+            //static ManualTimer timer("tokenize");
+            //timer.start();
             input_ids = m_tokenizer->encode(prompt);
-            timer.end();
+            //timer.end();
         }
 
         SequenceGroup::Ptr sequence_group = std::make_shared<SequenceGroup>(request_id, input_ids,
