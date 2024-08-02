@@ -139,7 +139,7 @@ public:
             std::lock_guard<std::mutex> lock{m_awaiting_requests_mutex};
             m_awaiting_requests.push_back(sequence_group);
         }
-        return std::make_unique<GenerationHandleImpl>(sequence_group->get_generation_stream(), sampling_params);
+        return std::make_shared<GenerationHandleImpl>(sequence_group->get_generation_stream(), sampling_params);
     }
 
     GenerationHandle add_request(uint64_t request_id, const std::string& prompt, ov::genai::GenerationConfig sampling_params) {
