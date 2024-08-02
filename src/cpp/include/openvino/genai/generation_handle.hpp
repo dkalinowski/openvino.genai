@@ -74,6 +74,8 @@ public:
 
     bool can_read();
 
+    void drop();
+
     GenerationOutputs back();
     // Reads result of a generation for single iteration
     GenerationOutputs read();
