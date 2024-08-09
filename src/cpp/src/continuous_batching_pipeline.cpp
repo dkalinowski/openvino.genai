@@ -162,12 +162,14 @@ public:
 
         // Pull awaiting requests
         {
-            /*
-        for (SequenceGroup::Ptr& request : m_requests) {
-            if (request->handle_dropped())
-                request->push_empty_outputs();
+            std::lock_guard<std::mutex> lock{m_awaiting_requests_mutex};
+            m_requests.insert(m_requests.end(), m_awaiting_requests.begin(), m_awaiting_requests.end());
+            m_awaiting_requests.clear();
         }
-            */
+
+        /*
+        Old
+{
             std::lock_guard<std::mutex> lock{m_awaiting_requests_mutex};
             
                 // Separate the requests that are not dropped
@@ -196,6 +198,7 @@ public:
             //m_requests.insert(m_requests.end(), m_awaiting_requests.begin(), m_awaiting_requests.end());
             m_awaiting_requests.clear();
         }
+        */
 
         m_pipeline_metrics.requests = m_requests.size();
         Scheduler::Output scheduler_output;
