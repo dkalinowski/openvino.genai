@@ -171,14 +171,20 @@ public:
             std::lock_guard<std::mutex> lock{m_awaiting_requests_mutex};
             
                 // Separate the requests that are not dropped
+            int dropped_no = 0;
+            int added_no = 0;
             auto it = std::remove_if(m_awaiting_requests.begin(), m_awaiting_requests.end(),
-                                    [](auto& request) {
+                                    [&dropped_no, &added_no](auto& request) {
                                         if (request->handle_dropped()) {
                                             request->push_empty_outputs(); // Call Drop() on dropped requests
+                                            dropped_no += 1;
                                             return true;    // Remove from the vector
                                         }
+                                        added_no += 1;
                                         return false;
                                     });
+
+            std::cout << "Dropped no: " << dropped_no << "; added no: " << added_no << std::endl;
 
             // Insert the remaining requests into m_requests
             m_requests.insert(m_requests.end(), m_awaiting_requests.begin(), it);
