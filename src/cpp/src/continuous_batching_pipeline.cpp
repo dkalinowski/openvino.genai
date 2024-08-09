@@ -162,8 +162,32 @@ public:
 
         // Pull awaiting requests
         {
+            /*
+        for (SequenceGroup::Ptr& request : m_requests) {
+            if (request->handle_dropped())
+                request->push_empty_outputs();
+        }
+            */
             std::lock_guard<std::mutex> lock{m_awaiting_requests_mutex};
-            m_requests.insert(m_requests.end(), m_awaiting_requests.begin(), m_awaiting_requests.end());
+            
+                // Separate the requests that are not dropped
+            auto it = std::remove_if(m_awaiting_requests.begin(), m_awaiting_requests.end(),
+                                    [](auto& request) {
+                                        if (request->handle_dropped()) {
+                                            request->push_empty_outputs(); // Call Drop() on dropped requests
+                                            return true;    // Remove from the vector
+                                        }
+                                        return false;
+                                    });
+
+            // Insert the remaining requests into m_requests
+            m_requests.insert(m_requests.end(), m_awaiting_requests.begin(), it);
+
+            // Erase the dropped requests
+            //m_awaiting_requests.erase(it, m_awaiting_requests.end());
+            
+            
+            //m_requests.insert(m_requests.end(), m_awaiting_requests.begin(), m_awaiting_requests.end());
             m_awaiting_requests.clear();
         }
 
