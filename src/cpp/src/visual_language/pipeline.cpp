@@ -183,6 +183,27 @@ public:
             )
         } {
 
+        // Language
+        auto language_model_it = compiled_models_map.find("language");
+        OPENVINO_ASSERT(language_model_it != compiled_models_map.end(),
+            "Compiled language model is not found in compiled_models_map");
+        auto language_compiled_model = language_model_it->second;
+        m_language = language_compiled_model.create_infer_request();
+
+        // Embedders
+
+        OPENVINO_ASSERT(1 == 0, "VLMPipelineImpl from CompiledModelsMap is not implemented yet");
+
+
+        // Misc
+
+        // If eos_token_id was not provided, take value
+        if (m_generation_config.eos_token_id == -1) {
+            m_generation_config.set_eos_token_id(m_tokenizer.get_eos_token_id());
+        }
+
+        m_sampler.set_tokenizer(m_tokenizer);
+        m_sampler.set_seed(m_generation_config.rng_seed);
     }
 
     VLMDecodedResults generate(
@@ -539,11 +560,9 @@ VLMPipeline::VLMPipeline(
 ) {
     auto start_time = std::chrono::steady_clock::now();
 
-    OPENVINO_ASSERT(1 == 0, "Hello from new constructor");
+    // TODO: Continuuous Batching support to be added later
 
-    // TODO
     m_pimpl = std::make_unique<VLMPipelineImpl>(models_dir, compiled_models_map, user_properties);
-    // TODO
 
     auto stop_time = std::chrono::steady_clock::now();
     m_pimpl->set_load_time(std::chrono::duration_cast<std::chrono::milliseconds>(stop_time - start_time).count());

@@ -243,6 +243,12 @@ private:
             const std::string& device,
             const ov::AnyMap device_config);
 
+        IInputsEmbedder(
+            const VLMConfig& vlm_config,
+            const std::filesystem::path& model_dir,
+            const CompiledModelsMap& models_map,
+            const ov::AnyMap device_config);
+
         virtual ov::Tensor apply_chat_template_tokenize(const std::string& prompt, ov::genai::VLMPerfMetrics& metrics);
 
         ov::Tensor update_history(const ov::Tensor& new_chat_tokens);

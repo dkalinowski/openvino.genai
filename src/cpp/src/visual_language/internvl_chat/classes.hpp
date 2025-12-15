@@ -35,6 +35,12 @@ public:
         const std::string& device,
         const ov::AnyMap device_config);
 
+    InputsEmbedderInternVLChat(
+            const VLMConfig& vlm_config,
+            const std::filesystem::path& model_dir,
+            const CompiledModelsMap& models_map,
+            const ov::AnyMap device_config);
+
     ov::Tensor get_inputs_embeds(const std::string& prompt, const std::vector<ov::genai::EncodedImage>& images, ov::genai::VLMPerfMetrics& metrics, bool recalculate_merged_embeddings = true, const std::vector<size_t>& image_sequence = {}) override;
 
     NormalizedPrompt normalize_prompt(

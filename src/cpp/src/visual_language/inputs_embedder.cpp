@@ -97,6 +97,31 @@ InputsEmbedder::IInputsEmbedder::IInputsEmbedder(
     )),
     m_tokenizer(tokenizer) { }
 
+InputsEmbedder::IInputsEmbedder::IInputsEmbedder(
+        const VLMConfig& vlm_config,
+        const std::filesystem::path& model_dir,
+        const CompiledModelsMap& models_map,
+        const ov::AnyMap device_config) :
+    m_vlm_config{vlm_config},
+    //m_vision_encoder(VisionEncoder::create(model_dir, m_vlm_config.model_type, device, device_config)),
+    //m_embedding(EmbeddingsModel::create(model_dir, m_vlm_config.scale_emb, device, device_config)),
+    m_tokenizer{model_dir, device_config} { }
+    // m_vision_encoder(VisionEncoder::create(
+    //     models_map,
+    //     config_dir_path,
+    //     m_vlm_config.model_type,
+    //     device,
+    //     device_config
+    // )),
+    // m_embedding(EmbeddingsModel::create(
+    //     utils::get_model_weights_pair(models_map, "text_embeddings").first,
+    //     utils::get_model_weights_pair(models_map, "text_embeddings").second,
+    //     m_vlm_config.scale_emb,
+    //     device,
+    //     device_config
+    // )),
+    // m_tokenizer(tokenizer) { }
+
 ov::Tensor InputsEmbedder::IInputsEmbedder::apply_chat_template_tokenize(const std::string& prompt, ov::genai::VLMPerfMetrics& metrics) {
     bool add_special_tokens = m_add_special_tokens_is_set ? m_add_special_tokens : !(m_is_chat_conversation || m_apply_chat_template);
     if (m_is_chat_conversation) {
@@ -257,7 +282,7 @@ InputsEmbedder::InputsEmbedder(const std::filesystem::path& model_dir,
     } else if (vlm_config.model_type == VLMModelType::LLAVA_NEXT_VIDEO) {
         m_impl = std::make_shared<InputsEmbedderLLaVANextVideo>(vlm_config, model_dir, device, device_config);
     } else if (vlm_config.model_type == VLMModelType::INTERNVL_CHAT) {
-        m_impl = std::make_shared<InputsEmbedderInternVLChat>(vlm_config, model_dir, device, device_config);
+        m_impl = std::make_shared<InputsEmbedderInternVLChat>(vlm_config, model_dir, device, device_config);  // ????
     } else if (vlm_config.model_type == VLMModelType::PHI3_V) {
         m_impl = std::make_shared<InputsEmbedderPhi3V>(vlm_config, model_dir, device, device_config);
     } else if (vlm_config.model_type == VLMModelType::PHI4MM) {
@@ -291,7 +316,7 @@ InputsEmbedder::InputsEmbedder(const ModelsMap& models_map,
     } else if (vlm_config.model_type == VLMModelType::LLAVA_NEXT_VIDEO) {
         m_impl = std::make_shared<InputsEmbedderLLaVANextVideo>(vlm_config, models_map, tokenizer, config_dir_path, device, device_config);
     } else if (vlm_config.model_type == VLMModelType::INTERNVL_CHAT) {
-        m_impl = std::make_shared<InputsEmbedderInternVLChat>(vlm_config, models_map, tokenizer, config_dir_path, device, device_config);
+        m_impl = std::make_shared<InputsEmbedderInternVLChat>(vlm_config, models_map, tokenizer, config_dir_path, device, device_config);  // ????
     } else if (vlm_config.model_type == VLMModelType::PHI3_V) {
         m_impl = std::make_shared<InputsEmbedderPhi3V>(vlm_config, models_map, tokenizer, config_dir_path, device, device_config);
     } else if (vlm_config.model_type == VLMModelType::PHI4MM) {
