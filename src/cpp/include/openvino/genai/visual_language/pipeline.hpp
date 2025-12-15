@@ -56,6 +56,8 @@ public:
     VLMPipeline(
         const std::filesystem::path& models_dir,
         const CompiledModelsMap& compiled_models_map,
+        size_t KVAxesPosition_batch,
+        size_t KVAxesPosition_seq_len,
         const ov::AnyMap& properties = {}
     );
 

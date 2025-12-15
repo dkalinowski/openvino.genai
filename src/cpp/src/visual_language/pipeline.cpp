@@ -175,6 +175,8 @@ public:
     VLMPipelineImpl(
         const std::filesystem::path& models_dir,
         const CompiledModelsMap& compiled_models_map,
+        size_t KVAxesPosition_batch,  // to be dropped
+        size_t KVAxesPosition_seq_len,
         const ov::AnyMap& properties = {}
     ) :
         m_generation_config{
@@ -197,6 +199,13 @@ public:
 
 
         // Misc
+        m_tokenizer = m_inputs_embedder->get_tokenizer();
+        m_embedding = m_inputs_embedder->get_embedding_model();
+        // NPU is not supporting history, so in chat scenarios let's use full chat history on each iteration
+        m_use_full_chat_history = false;//m_is_npu;
+
+        utils::KVCacheState& kv_cache_state = m_inputs_embedder->get_kv_cache_state();
+        kv_cache_state.seq_length_axis = KVAxesPosition_seq_len;
 
         // If eos_token_id was not provided, take value
         if (m_generation_config.eos_token_id == -1) {
@@ -557,13 +566,15 @@ VLMPipeline::VLMPipeline(
 VLMPipeline::VLMPipeline(
     const std::filesystem::path& models_dir,
     const CompiledModelsMap& compiled_models_map,
+    size_t KVAxesPosition_batch,
+    size_t KVAxesPosition_seq_len,
     const ov::AnyMap& user_properties
 ) {
     auto start_time = std::chrono::steady_clock::now();
 
     // TODO: Continuuous Batching support to be added later
 
-    m_pimpl = std::make_unique<VLMPipelineImpl>(models_dir, compiled_models_map, user_properties);
+    m_pimpl = std::make_unique<VLMPipelineImpl>(models_dir, compiled_models_map, KVAxesPosition_batch, KVAxesPosition_seq_len, user_properties);
 
     auto stop_time = std::chrono::steady_clock::now();
     m_pimpl->set_load_time(std::chrono::duration_cast<std::chrono::milliseconds>(stop_time - start_time).count());
