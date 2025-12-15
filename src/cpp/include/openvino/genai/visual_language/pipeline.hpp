@@ -53,6 +53,12 @@ public:
         const ov::genai::GenerationConfig& generation_config = {}
     );
 
+    VLMPipeline(
+        const std::filesystem::path& models_dir,
+        const CompiledModelsMap& compiled_models_map,
+        const ov::AnyMap& properties = {}
+    );
+
     /// @brief Construct a pipeline from a folder containing tokenizer
     /// and model IRs. Accepts arbitrary list of optional properties.
     /// @param models_path A folder to read tokenizer and model IRs.

@@ -172,6 +172,19 @@ public:
         m_sampler.set_seed(m_generation_config.rng_seed);
     }
 
+    VLMPipelineImpl(
+        const std::filesystem::path& models_dir,
+        const CompiledModelsMap& compiled_models_map,
+        const ov::AnyMap& properties = {}
+    ) :
+        m_generation_config{
+            utils::from_config_json_if_exists<GenerationConfig>(
+                models_dir, "generation_config.json"
+            )
+        } {
+
+    }
+
     VLMDecodedResults generate(
         const std::string& prompt,
         const std::vector<ov::Tensor>& images,
@@ -514,6 +527,23 @@ VLMPipeline::VLMPipeline(
         }
 
     }
+
+    auto stop_time = std::chrono::steady_clock::now();
+    m_pimpl->set_load_time(std::chrono::duration_cast<std::chrono::milliseconds>(stop_time - start_time).count());
+}
+
+VLMPipeline::VLMPipeline(
+    const std::filesystem::path& models_dir,
+    const CompiledModelsMap& compiled_models_map,
+    const ov::AnyMap& user_properties
+) {
+    auto start_time = std::chrono::steady_clock::now();
+
+    OPENVINO_ASSERT(1 == 0, "Hello from new constructor");
+
+    // TODO
+    m_pimpl = std::make_unique<VLMPipelineImpl>(models_dir, compiled_models_map, user_properties);
+    // TODO
 
     auto stop_time = std::chrono::steady_clock::now();
     m_pimpl->set_load_time(std::chrono::duration_cast<std::chrono::milliseconds>(stop_time - start_time).count());
