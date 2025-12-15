@@ -193,7 +193,7 @@ public:
         // Embedders
         m_inputs_embedder = std::make_shared<InputsEmbedder>(compiled_models_map, models_dir, properties);
 
-        OPENVINO_ASSERT(1 == 0, "VLMPipelineImpl from CompiledModelsMap is not implemented yet");
+        //OPENVINO_ASSERT(1 == 0, "VLMPipelineImpl from CompiledModelsMap is not implemented yet");
 
 
         // Misc

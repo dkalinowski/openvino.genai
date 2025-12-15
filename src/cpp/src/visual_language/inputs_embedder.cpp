@@ -108,7 +108,7 @@ InputsEmbedder::IInputsEmbedder::IInputsEmbedder(
     m_tokenizer{model_dir, device_config} {
 
 
-        auto vision_model_it = models_map.find("vision");
+        auto vision_model_it = models_map.find("vision_embeddings");
         OPENVINO_ASSERT(vision_model_it != models_map.end(),
             "Compiled model for vision encoder is not found in models_map");
         auto vision_model = vision_model_it->second;
