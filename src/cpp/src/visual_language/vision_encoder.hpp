@@ -110,6 +110,11 @@ public:
         const std::string& device,
         const ov::AnyMap properties = {});
 
+    static VisionEncoder::Ptr create(
+        CompiledModel& compiled_model,
+        const std::filesystem::path& config_dir_path,
+        const VLMModelType model_type);
+
     /// @brief Compute embeddings of an image given
     /// ProcessorConfig members.
     /// @param image An image to infer embeddings for. Image shape must be
@@ -147,6 +152,11 @@ public:
         const std::filesystem::path& config_dir_path,
         const std::string& device,
         const ov::AnyMap properties);
+
+    VisionEncoder(
+        CompiledModel& compiled_model,
+        const std::filesystem::path& config_dir_path,
+        const VLMModelType model_type);
 };
 
 } // namespace ov::genai

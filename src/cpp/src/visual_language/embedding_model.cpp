@@ -68,6 +68,13 @@ EmbeddingsModel::EmbeddingsModel(const std::string& model,
     m_embeddings_requests_queue = init(compiled_model);
 }
 
+EmbeddingsModel::EmbeddingsModel(CompiledModel& compiled_model) {
+    // apply embedding postprocessing step by merging them into the model
+    //merge_postprocess(m_model, scale_emb);  // TODO: To be moved to OVMS
+
+    m_embeddings_requests_queue = init(compiled_model);
+}
+
 std::unique_ptr<CircularBufferQueue<EmbeddingsRequest>>& EmbeddingsModel::get_request_queue() {
     return this->m_embeddings_requests_queue;
 }

@@ -47,6 +47,19 @@ VisionEncoder::VisionEncoder(
     m_processor_config = utils::from_config_json_if_exists<ProcessorConfig>(config_dir_path, "preprocessor_config.json");
 }
 
+VisionEncoder::VisionEncoder(
+        CompiledModel& compiled_model,
+        const std::filesystem::path& config_dir_path,
+        const VLMModelType model_type) {
+    ov::genai::utils::print_compiled_model_properties(compiled_model, "VLM vision embeddings model");
+    m_ireq_queue_vision_encoder = std::make_unique<CircularBufferQueue<ov::InferRequest>>(
+        compiled_model.get_property(ov::optimal_number_of_infer_requests),
+        [&compiled_model]() -> ov::InferRequest {
+            return compiled_model.create_infer_request();
+        });
+    m_processor_config = utils::from_config_json_if_exists<ProcessorConfig>(config_dir_path, "preprocessor_config.json");
+}
+
 ProcessorConfig VisionEncoder::get_processor_config() const {
     return m_processor_config;
 }
@@ -107,6 +120,44 @@ VisionEncoder::Ptr VisionEncoder::create(
         return std::make_shared<VisionEncoderQwen2_5_VL>(models_map, config_dir_path, device, device_config);
     } else if (model_type == VLMModelType::GEMMA3) {
         return std::make_shared<VisionEncoderGemma3>(models_map, config_dir_path, device, device_config);
+    } else {
+        OPENVINO_THROW("Unsupported model type in VLM VisionEncoder class. Please, create feature request on new model support");
+    }
+}
+
+VisionEncoder::Ptr VisionEncoder::create(
+    CompiledModel& compiled_model,
+    const std::filesystem::path& config_dir_path,
+    const VLMModelType model_type) {
+    // if (model_type == VLMModelType::MINICPM) {
+    //     return std::make_shared<VisionEncoderMiniCPM>(models_map, config_dir_path, device, device_config);
+    // } else if (model_type == VLMModelType::LLAVA) {
+    //     return std::make_shared<VisionEncoderLLaVA>(models_map, config_dir_path, device, device_config);
+    // } else if (model_type == VLMModelType::NANOLLAVA) {
+    //     return std::make_shared<VisionEncoderNanoLLaVA>(models_map, config_dir_path, device, device_config);
+    // } else if (model_type == VLMModelType::LLAVA_NEXT) {
+    //     return std::make_shared<VisionEncoderLLaVANext>(models_map, config_dir_path, device, device_config);
+    // } else if (model_type == VLMModelType::LLAVA_NEXT_VIDEO) {
+    //     return std::make_shared<VisionEncoderLLaVANextVideo>(models_map, config_dir_path, device, device_config);
+    // } else if (model_type == VLMModelType::INTERNVL_CHAT) {
+    //     return std::make_shared<VisionEncoderInternVLChat>(models_map, config_dir_path, device, device_config);
+    // } else if (model_type == VLMModelType::PHI3_V) {
+    //     return std::make_shared<VisionEncoderPhi3V>(models_map, config_dir_path, device, device_config);
+    // } else if (model_type == VLMModelType::PHI4MM) {
+    //     return std::make_shared<VisionEncoderPhi4MM>(models_map, config_dir_path, device, device_config);
+    // } else if (model_type == VLMModelType::QWEN2_VL) {
+    //     return std::make_shared<VisionEncoderQwen2VL>(models_map, config_dir_path, device, device_config);
+    // } else if (model_type == VLMModelType::QWEN2_5_VL) {
+    //     return std::make_shared<VisionEncoderQwen2_5_VL>(models_map, config_dir_path, device, device_config);
+    // } else if (model_type == VLMModelType::GEMMA3) {
+    //     return std::make_shared<VisionEncoderGemma3>(models_map, config_dir_path, device, device_config);
+    // } else {
+    //     OPENVINO_THROW("Unsupported model type in VLM VisionEncoder class. Please, create feature request on new model support");
+    // }
+
+    // TODO
+    if (model_type == VLMModelType::INTERNVL_CHAT) {
+        return std::make_shared<VisionEncoderInternVLChat>(compiled_model, config_dir_path, model_type);
     } else {
         OPENVINO_THROW("Unsupported model type in VLM VisionEncoder class. Please, create feature request on new model support");
     }

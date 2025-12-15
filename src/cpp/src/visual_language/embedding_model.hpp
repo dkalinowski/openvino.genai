@@ -43,6 +43,8 @@ public:
                     const float scale_emb,
                     const std::string& device,
                     const ov::AnyMap& properties);
+    
+    EmbeddingsModel(CompiledModel& compiled_model);
 
     EmbeddingsModel() = default;
 
@@ -59,6 +61,10 @@ public:
                       const std::string& device,
                       const ov::AnyMap& properties) {
         return std::make_shared<EmbeddingsModel>(model, weights, scale_emb, device, properties);
+    }
+
+    static Ptr create(CompiledModel& compiled_model) {
+        return std::make_shared<EmbeddingsModel>(compiled_model);
     }
 
     // We have getter for the request queue, so we can reserve request outside of infer scope

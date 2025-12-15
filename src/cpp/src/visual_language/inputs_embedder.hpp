@@ -39,6 +39,10 @@ public:
                    const std::filesystem::path& config_dir_path,
                    const std::string& device,
                    const ov::AnyMap device_config);
+    
+    InputsEmbedder(const CompiledModelsMap& models_map,
+                   const std::filesystem::path& model_dir,
+                   const ov::AnyMap device_config);
 
     // compute input embedding for prompt and multiple images
     ov::Tensor get_inputs_embeds(const std::string& prompt, const std::vector<ov::genai::EncodedImage>& images, ov::genai::VLMPerfMetrics& metrics, bool recalculate_merged_embeddings = true, const std::vector<size_t>& image_sequence = {});

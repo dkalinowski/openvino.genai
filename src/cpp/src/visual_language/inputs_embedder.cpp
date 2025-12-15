@@ -105,7 +105,25 @@ InputsEmbedder::IInputsEmbedder::IInputsEmbedder(
     m_vlm_config{vlm_config},
     //m_vision_encoder(VisionEncoder::create(model_dir, m_vlm_config.model_type, device, device_config)),
     //m_embedding(EmbeddingsModel::create(model_dir, m_vlm_config.scale_emb, device, device_config)),
-    m_tokenizer{model_dir, device_config} { }
+    m_tokenizer{model_dir, device_config} {
+
+
+        auto vision_model_it = models_map.find("vision");
+        OPENVINO_ASSERT(vision_model_it != models_map.end(),
+            "Compiled model for vision encoder is not found in models_map");
+        auto vision_model = vision_model_it->second;
+        m_vision_encoder = VisionEncoder::create(
+            vision_model,
+            model_dir,
+            m_vlm_config.model_type
+        );
+
+        auto embedding_model_it = models_map.find("text_embeddings");
+        OPENVINO_ASSERT(embedding_model_it != models_map.end(),
+            "Compiled model for text embeddings is not found in models_map");
+        auto embedding_model = embedding_model_it->second;
+        m_embedding = EmbeddingsModel::create(embedding_model);
+    }
     // m_vision_encoder(VisionEncoder::create(
     //     models_map,
     //     config_dir_path,
@@ -327,6 +345,45 @@ InputsEmbedder::InputsEmbedder(const ModelsMap& models_map,
         m_impl = std::make_shared<InputsEmbedderQwen2_5_VL>(vlm_config, models_map, tokenizer, config_dir_path, device, device_config);
     } else if (vlm_config.model_type == VLMModelType::GEMMA3) {
         m_impl = std::make_shared<InputsEmbedderGemma3>(vlm_config, models_map, tokenizer, config_dir_path, device, device_config);
+    } else {
+        OPENVINO_THROW("Unsupported model type in VLM InputsEmbedder class. Please, create feature request on new model support");
+    }
+}
+
+InputsEmbedder::InputsEmbedder(const CompiledModelsMap& models_map,
+                               const std::filesystem::path& config_dir_path,
+                               const ov::AnyMap device_config) {
+    auto vlm_config = utils::from_config_json_if_exists<VLMConfig>(config_dir_path, "config.json");
+
+    // if (vlm_config.model_type == VLMModelType::MINICPM) {
+    //     m_impl = std::make_shared<InputsEmbedderMiniCPM>(vlm_config, models_map, tokenizer, config_dir_path, device, device_config);
+    // } else if (vlm_config.model_type == VLMModelType::LLAVA) {
+    //     m_impl = std::make_shared<InputsEmbedderLLaVA>(vlm_config, models_map, tokenizer, config_dir_path, device, device_config);
+    // } else if (vlm_config.model_type == VLMModelType::NANOLLAVA) {
+    //     m_impl = std::make_shared<InputsEmbedderNanoLLaVA>(vlm_config, models_map, tokenizer, config_dir_path, device, device_config);
+    // } else if (vlm_config.model_type == VLMModelType::LLAVA_NEXT) {
+    //     m_impl = std::make_shared<InputsEmbedderLLaVANext>(vlm_config, models_map, tokenizer, config_dir_path, device, device_config);
+    // } else if (vlm_config.model_type == VLMModelType::LLAVA_NEXT_VIDEO) {
+    //     m_impl = std::make_shared<InputsEmbedderLLaVANextVideo>(vlm_config, models_map, tokenizer, config_dir_path, device, device_config);
+    // } else if (vlm_config.model_type == VLMModelType::INTERNVL_CHAT) {
+    //     m_impl = std::make_shared<InputsEmbedderInternVLChat>(vlm_config, models_map, tokenizer, config_dir_path, device, device_config);  // ????
+    // } else if (vlm_config.model_type == VLMModelType::PHI3_V) {
+    //     m_impl = std::make_shared<InputsEmbedderPhi3V>(vlm_config, models_map, tokenizer, config_dir_path, device, device_config);
+    // } else if (vlm_config.model_type == VLMModelType::PHI4MM) {
+    //     m_impl = std::make_shared<InputsEmbedderPhi4MM>(vlm_config, models_map, tokenizer, config_dir_path, device, device_config);
+    // } else if (vlm_config.model_type == VLMModelType::QWEN2_VL) {
+    //     m_impl = std::make_shared<InputsEmbedderQwen2VL>(vlm_config, models_map, tokenizer, config_dir_path, device, device_config);
+    // } else if (vlm_config.model_type == VLMModelType::QWEN2_5_VL) {
+    //     m_impl = std::make_shared<InputsEmbedderQwen2_5_VL>(vlm_config, models_map, tokenizer, config_dir_path, device, device_config);
+    // } else if (vlm_config.model_type == VLMModelType::GEMMA3) {
+    //     m_impl = std::make_shared<InputsEmbedderGemma3>(vlm_config, models_map, tokenizer, config_dir_path, device, device_config);
+    // } else {
+    //     OPENVINO_THROW("Unsupported model type in VLM InputsEmbedder class. Please, create feature request on new model support");
+    // }
+
+
+    if (vlm_config.model_type == VLMModelType::INTERNVL_CHAT) {
+        m_impl = std::make_shared<InputsEmbedderInternVLChat>(vlm_config, config_dir_path, models_map, device_config);
     } else {
         OPENVINO_THROW("Unsupported model type in VLM InputsEmbedder class. Please, create feature request on new model support");
     }
