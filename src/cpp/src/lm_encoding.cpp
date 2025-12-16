@@ -242,10 +242,28 @@ ov::genai::utils::GenerationFinishInfo get_lm_encoded_results(
         }
 
         if (m_embedding) {
-            constexpr bool return_remote_tensor = false;//true;  // false? always copy? which heuristic?
+            std::cout << "m4.1" << std::endl;
+            //constexpr bool return_remote_tensor =true;
+            // return_remote_tensor only if llm and embedding are on the same device
             CircularBufferQueueElementGuard<EmbeddingsRequest> embeddings_request_guard(m_embedding->get_request_queue().get());
             EmbeddingsRequest& req = embeddings_request_guard.get();
+            bool return_remote_tensor = req.ireq.get_compiled_model().get_property("DEVICE_NAME").as<std::string>() == m_llm.get_compiled_model().get_property("DEVICE_NAME").as<std::string>();
+            std::cout << "Embedding device: " << req.ireq.get_compiled_model().get_property("DEVICE_NAME").as<std::string>() << std::endl;
+            std::cout << "LLM device: " << m_llm.get_compiled_model().get_property("DEVICE_NAME").as<std::string>() << std::endl;
+            std::cout << "Return remote tensor: " << return_remote_tensor << std::endl;
+            // print input shape
+            std::cout << "new_input_ids shape: ";
+            for (const auto& dim : new_input_ids.get_shape()) {
+                std::cout << dim << " ";
+            }
+            std::cout << std::endl;
             const ov::Tensor& embed_prompt_tensor = m_embedding->infer(req, new_input_ids, return_remote_tensor);
+            // print output shape
+            std::cout << "embed_prompt_tensor shape: ";
+            for (const auto& dim : embed_prompt_tensor.get_shape()) {
+                std::cout << dim << " ";
+            }
+            std::cout << std::endl;
             // copy tensor to cpu
             //ov::Tensor embed_prompt_cpu_tensor = ov::Tensor{embed_prompt_tensor.get_element_type(), embed_prompt_tensor.get_shape()};
             //embed_prompt_tensor.copy_to(embed_prompt_cpu_tensor);
@@ -258,6 +276,7 @@ ov::genai::utils::GenerationFinishInfo get_lm_encoded_results(
                 m_llm.set_tensor("token_type_ids", new_token_type_ids);
             }
         } else {
+            std::cout << "m4.2" << std::endl;
             m_llm.set_tensor("input_ids", new_input_ids);
         }
         std::cout << "m5" << std::endl;
