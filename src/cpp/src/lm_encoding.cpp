@@ -242,15 +242,15 @@ ov::genai::utils::GenerationFinishInfo get_lm_encoded_results(
         }
 
         if (m_embedding) {
-            constexpr bool return_remote_tensor = true;  // false? always copy? which heuristic?
+            constexpr bool return_remote_tensor = false;//true;  // false? always copy? which heuristic?
             CircularBufferQueueElementGuard<EmbeddingsRequest> embeddings_request_guard(m_embedding->get_request_queue().get());
             EmbeddingsRequest& req = embeddings_request_guard.get();
             const ov::Tensor& embed_prompt_tensor = m_embedding->infer(req, new_input_ids, return_remote_tensor);
             // copy tensor to cpu
-            ov::Tensor embed_prompt_cpu_tensor = ov::Tensor{embed_prompt_tensor.get_element_type(), embed_prompt_tensor.get_shape()};
-            embed_prompt_tensor.copy_to(embed_prompt_cpu_tensor);
-            m_llm.set_tensor("inputs_embeds", embed_prompt_cpu_tensor);
-            //m_llm.set_tensor("inputs_embeds", embed_prompt_tensor);
+            //ov::Tensor embed_prompt_cpu_tensor = ov::Tensor{embed_prompt_tensor.get_element_type(), embed_prompt_tensor.get_shape()};
+            //embed_prompt_tensor.copy_to(embed_prompt_cpu_tensor);
+            //m_llm.set_tensor("inputs_embeds", embed_prompt_cpu_tensor);
+            m_llm.set_tensor("inputs_embeds", embed_prompt_tensor);
             if (token_type_ids.has_value()) {
                 ov::Tensor new_token_type_ids(ov::element::i64, {total_num_tokens, 1});
                 int64_t* token_type_data = new_token_type_ids.data<int64_t>();
