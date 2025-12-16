@@ -260,12 +260,17 @@ public:
             if (m_is_chat_conversation)
                 OPENVINO_ASSERT(videos.empty(), "Chat mode is currently not supported with video input for NPU device!");
         }
+        std::cout << "111111111111111111111" << std::endl;
         auto encoded_images = m_inputs_embedder->encode_images(images);
+        std::cout << "2222222222222222" << std::endl;
         OPENVINO_ASSERT(images.size() == encoded_images.size(), "Input images size and encoded images size mismatch!");
         const auto encoded_videos = m_inputs_embedder->encode_videos(videos);
+        std::cout << "3333333333333333333" << std::endl;
         auto [unified_prompt, image_sequence, video_sequence] = m_inputs_embedder->normalize_prompt(prompt, m_image_id, m_video_id, encoded_images, encoded_videos);
+        std::cout << "4444444444444444" << std::endl;
 
         if (m_is_chat_conversation) {
+            std::cout << "55555555555555.1" << std::endl;
             m_history.push_back({{"role", "user"}, {"content", unified_prompt}});
             unified_prompt = m_tokenizer.apply_chat_template(m_history, true);
 
@@ -285,8 +290,11 @@ public:
                 }
             }
         } else {
+            std::cout << "55555555555555.2" << std::endl;
             m_inputs_embedder->set_apply_chat_template_status(generation_config.apply_chat_template);
         }
+        std::cout << "6666666666666" << std::endl;
+
         ov::Tensor inputs_embeds;
         std::optional<ov::Tensor> token_type_ids;
         bool recalculate_merged_embeddings = encoded_images.size() > 0 || encoded_videos.size() > 0;
@@ -304,6 +312,7 @@ public:
         } else {
             inputs_embeds = m_inputs_embedder->get_inputs_embeds(unified_prompt, encoded_images, encoded_videos, perf_metrics, recalculate_merged_embeddings, image_sequence, video_sequence);
         }
+        std::cout << "777777777777777777" << std::endl;
         auto end_get_inputs_embeds = std::chrono::steady_clock::now();
 
         if (m_is_npu) {
@@ -329,6 +338,7 @@ public:
         size_t request_id = 0;
         size_t block_size = 1; // not used
 
+        std::cout << "888888888888888888" << std::endl;
         size_t history_size = m_language.get_tensor("attention_mask").get_shape().at(1) - kv_cache_state.num_tokens_to_trim;
         size_t inputs_embeds_size = inputs_embeds.get_shape().at(1);
 
@@ -347,16 +357,20 @@ public:
             (generation_config.is_greedy_decoding() || generation_config.is_multinomial()),
             "Currently streaming is possible only with batch size=1 and only for greedy or multinomial decoding");
 
+        std::cout << "999999999999999" << std::endl;
         ov::Tensor new_atten_mask = ov::Tensor{ov::element::i64, { 1, history_size + inputs_embeds_size }};
         std::fill_n(new_atten_mask.data<int64_t>(), new_atten_mask.get_size(), 1);
+        std::cout << "aaaaaaaaaa" << std::endl;
 
         ov::Tensor position_ids;
         std::optional<int64_t> rope_delta;
         std::tie(position_ids, rope_delta) = m_inputs_embedder->get_position_ids(inputs_embeds_size, history_size);
+        std::cout << "bbbbb" << std::endl;
 
         if (m_sampler.get_seed() != generation_config.rng_seed) {
             m_sampler.set_seed(generation_config.rng_seed);
         }
+        std::cout << "cccccc" << std::endl;
 
         ov::genai::utils::GenerationFinishInfo finish_info = ov::genai::get_lm_encoded_results(
             m_language, inputs_embeds, new_atten_mask, streamer_ptr, m_sampler, std::move(requests),
@@ -364,6 +378,8 @@ public:
         );
         EncodedResults& encoded_result = finish_info.results;
 
+        std::cout << "zzzzzzzzzzzz" << std::endl;
+        
         auto decode_start_time = std::chrono::steady_clock::now();
         VLMDecodedResults decoded;
         for (size_t idx = 0; idx < encoded_result.tokens.size(); ++idx) {

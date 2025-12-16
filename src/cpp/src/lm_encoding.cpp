@@ -86,12 +86,14 @@ ov::genai::utils::GenerationFinishInfo get_lm_encoded_results(
     std::optional<int64_t> rope_delta,
     const size_t max_kv_cache_size
 ) {
+    std::cout << "ddddddd" << std::endl;
     std::vector<GenerationHandle> generations;
     for (SequenceGroup::Ptr sequence_group : sequence_groups) {
         generations.push_back(std::make_shared<GenerationHandleImpl>(sequence_group->get_generation_stream(), sequence_group->get_sampling_parameters()));
     }
 
     auto active_sequence_groups{sequence_groups};
+    std::cout << "eeeeee" << std::endl;
 
     auto stream_generated_tokens = [&streamer_ptr, &generations, &active_sequence_groups]() {
         GenerationHandle& handle = generations.at(0);
@@ -106,6 +108,7 @@ ov::genai::utils::GenerationFinishInfo get_lm_encoded_results(
             }
         }
     };
+    std::cout << "fffffffffffffff" << std::endl;
 
     auto free_non_running_requests = [&streamer_ptr, &generations, &active_sequence_groups, &max_kv_cache_size]() {
         for (auto& sg : active_sequence_groups) {
@@ -126,12 +129,14 @@ ov::genai::utils::GenerationFinishInfo get_lm_encoded_results(
     const size_t batch_size = prompts_shape[0];
 
     // Initialize results and performance metrics.
+    std::cout << "gggggggggggggg" << std::endl;
 
     ov::genai::utils::GenerationFinishInfo finish_info;
     auto& raw_perf_counters = finish_info.results.perf_metrics.raw_metrics;
     raw_perf_counters.m_inference_durations = {{ MicroSeconds(0.0f) }};
 
     // Initialize inputs
+    std::cout << "hhhhhhhhhhhhhhh" << std::endl;
 
     if (m_embedding) {
         m_llm.set_tensor("inputs_embeds", input_ids);
@@ -148,6 +153,7 @@ ov::genai::utils::GenerationFinishInfo get_lm_encoded_results(
     ov::Tensor beam_idx = ov::Tensor(ov::element::i32, {batch_size});
     std::fill_n(beam_idx.data<int32_t>(), batch_size, 0);
     m_llm.set_tensor("beam_idx", beam_idx);
+    std::cout << "iiiiiiiiiiiiiii" << std::endl;
 
     // "Prompt" phase
 
@@ -160,6 +166,7 @@ ov::genai::utils::GenerationFinishInfo get_lm_encoded_results(
     raw_perf_counters.m_token_infer_durations.emplace_back(infer_ms);
 
     auto logits = m_llm.get_tensor("logits");
+    std::cout << "jjjjjjjjjjjjjjj" << std::endl;
 
     int64_t output_sequence_len = logits.get_shape().at(1);
     for (auto& sequence_group : sequence_groups) {
@@ -170,6 +177,7 @@ ov::genai::utils::GenerationFinishInfo get_lm_encoded_results(
     std::map<size_t, size_t> beam_offets;
     for (size_t i = 0; i < sequence_groups.size(); i++)
         beam_offets.insert({sequence_groups.at(i)->get_request_id(), i});
+    std::cout << "kkkkkkkkkkkkkk" << std::endl;
 
     SamplerOutput sampler_output = sampler.sample(sequence_groups, logits);
     free_non_running_requests(); // handle sampler output
@@ -178,8 +186,10 @@ ov::genai::utils::GenerationFinishInfo get_lm_encoded_results(
     raw_perf_counters.m_batch_sizes.emplace_back(sampler_output.num_generated_tokens);
 
     // "Generation" phase
+    std::cout << "llllllllllllllllllllll" << std::endl;
 
     while (!active_sequence_groups.empty()) {
+        std::cout << "m1" << std::endl;
         size_t total_num_tokens = 0;
 
         for (auto& sequence_group : active_sequence_groups) {
@@ -188,12 +198,15 @@ ov::genai::utils::GenerationFinishInfo get_lm_encoded_results(
             size_t num_sequences = sequence_group->num_running_seqs();
             total_num_tokens += sequence_group->get_num_scheduled_tokens() * num_sequences;
         }
+        std::cout << "m2" << std::endl;
+
 
         ov::Tensor new_input_ids(ov::element::i64, {total_num_tokens, 1});
         int64_t * input_ids_data = new_input_ids.data<int64_t>();
 
         std::vector<int32_t> next_beams;
         size_t current_batch_size = 0;
+        std::cout << "m3" << std::endl;
 
         for (auto& sequence_group : active_sequence_groups) {
             std::vector<Sequence::Ptr> running_sequences = sequence_group->get_running_sequences();
@@ -222,6 +235,7 @@ ov::genai::utils::GenerationFinishInfo get_lm_encoded_results(
 
             current_batch_size += num_running_sequences;
         }
+        std::cout << "m4" << std::endl;
 
         for (size_t i = 0; i < active_sequence_groups.size(); i++) {
             beam_offets[active_sequence_groups.at(i)->get_request_id()] = i == 0 ? 0 : (active_sequence_groups.at(i - 1)->num_running_seqs() + beam_offets[i - 1]);
@@ -242,6 +256,7 @@ ov::genai::utils::GenerationFinishInfo get_lm_encoded_results(
         } else {
             m_llm.set_tensor("input_ids", new_input_ids);
         }
+        std::cout << "m5" << std::endl;
 
         // we don't need to keep state for non chat mode and for beam_search in chat mode
         // in case of beam_search in chat mode, kv cache contains info about longest generated result among all sequences
@@ -258,6 +273,7 @@ ov::genai::utils::GenerationFinishInfo get_lm_encoded_results(
                 update_position_ids(m_llm.get_tensor("position_ids"), m_llm.get_tensor("attention_mask"));
             }
         }
+        std::cout << "m6" << std::endl;
 
         m_llm.set_tensor("beam_idx", ov::Tensor{ov::element::i32, {total_num_tokens}, next_beams.data()});
 
@@ -266,25 +282,32 @@ ov::genai::utils::GenerationFinishInfo get_lm_encoded_results(
 
         stream_generated_tokens();
         free_non_running_requests(); // to handle streaming response
+        std::cout << "m7" << std::endl;
 
         m_llm.wait();
+        std::cout << "m8" << std::endl;
 
         const auto infer_end = std::chrono::steady_clock::now();
         const auto infer_ms = PerfMetrics::get_microsec(infer_end - infer_start);
         raw_perf_counters.m_inference_durations[0] += MicroSeconds(infer_ms);
         raw_perf_counters.m_token_infer_durations.emplace_back(infer_ms);
 
+        std::cout << "m9" << std::endl;
         sampler_output = sampler.sample(active_sequence_groups, m_llm.get_tensor("logits"));
+        std::cout << "m10" << std::endl;
         free_non_running_requests(); // handle sampler output
+        std::cout << "m11" << std::endl;
         
         raw_perf_counters.m_new_token_times.emplace_back(std::chrono::steady_clock::now());
         raw_perf_counters.m_batch_sizes.emplace_back(sampler_output.num_generated_tokens);
     }
+    std::cout << "nnn" << std::endl;
 
     stream_generated_tokens();
     if (streamer_ptr) { // push streamer's cache
         streamer_ptr->end();
     }
+    std::cout << "ooooo" << std::endl;
 
     for (auto& sequence_group : sequence_groups) {
         auto sampling_params = sequence_group->get_sampling_parameters();
@@ -302,6 +325,7 @@ ov::genai::utils::GenerationFinishInfo get_lm_encoded_results(
     }
 
     finish_info.streaming_finish_status = sequence_groups[0]->get_generation_stream()->get_status();
+    std::cout << "pppppppp" << std::endl;
 
     for (SequenceGroup::Ptr sequence_group : sequence_groups)
         sampler.clear_request_info(sequence_group->get_request_id());
