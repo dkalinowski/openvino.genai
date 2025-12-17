@@ -243,14 +243,10 @@ ov::genai::utils::GenerationFinishInfo get_lm_encoded_results(
 
         if (m_embedding) {
             std::cout << "m4.1" << std::endl;
-            //constexpr bool return_remote_tensor =true;
-            // return_remote_tensor only if llm and embedding are on the same device
+            constexpr bool return_remote_tensor = false;//true;
             CircularBufferQueueElementGuard<EmbeddingsRequest> embeddings_request_guard(m_embedding->get_request_queue().get());
             EmbeddingsRequest& req = embeddings_request_guard.get();
-            bool return_remote_tensor = req.ireq.get_compiled_model().get_property("DEVICE_NAME").as<std::string>() == m_llm.get_compiled_model().get_property("DEVICE_NAME").as<std::string>();
-            std::cout << "Embedding device: " << req.ireq.get_compiled_model().get_property("DEVICE_NAME").as<std::string>() << std::endl;
-            std::cout << "LLM device: " << m_llm.get_compiled_model().get_property("DEVICE_NAME").as<std::string>() << std::endl;
-            std::cout << "Return remote tensor: " << return_remote_tensor << std::endl;
+            //bool return_remote_tensor = req.ireq.get_compiled_model().get_property("DEVICE_NAME").as<std::string>() == m_llm.get_compiled_model().get_property("DEVICE_NAME").as<std::string>();
             // print input shape
             std::cout << "new_input_ids shape: ";
             for (const auto& dim : new_input_ids.get_shape()) {
