@@ -222,18 +222,16 @@ public:
         // NPU is not supporting history, so in chat scenarios let's use full chat history on each iteration
         m_use_full_chat_history = m_is_npu;
 
-        OPENVINO_ASSERT(1 == 0, "Hello from here");
+        utils::KVCacheState& kv_cache_state = m_inputs_embedder->get_kv_cache_state();
+        kv_cache_state.seq_length_axis = kv_pos.seq_len;
 
-        // utils::KVCacheState& kv_cache_state = m_inputs_embedder->get_kv_cache_state();
-        // kv_cache_state.seq_length_axis = kv_pos.seq_len;
+        // If eos_token_id was not provided, take value
+        if (m_generation_config.eos_token_id == -1) {
+            m_generation_config.set_eos_token_id(m_tokenizer.get_eos_token_id());
+        }
 
-        // // If eos_token_id was not provided, take value
-        // if (m_generation_config.eos_token_id == -1) {
-        //     m_generation_config.set_eos_token_id(m_tokenizer.get_eos_token_id());
-        // }
-
-        // m_sampler.set_tokenizer(m_tokenizer);
-        // m_sampler.set_seed(m_generation_config.rng_seed);
+        m_sampler.set_tokenizer(m_tokenizer);
+        m_sampler.set_seed(m_generation_config.rng_seed);
     }
 
     VLMPipelineImpl(
