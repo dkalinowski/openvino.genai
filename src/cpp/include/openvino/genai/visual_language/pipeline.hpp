@@ -35,6 +35,12 @@ public:
         const ov::AnyMap& properties = {}
     );
 
+    VLMPipeline(
+        const std::filesystem::path& models_path,
+        const DeviceMapping& device_mapping,
+        const ov::AnyMap& properties = {}
+    );
+
     /// @brief Construct a pipeline from a map of models and their weights.
     /// @param models_map A map where key is model name (e.g. "vision_embeddings", "text_embeddings", "language", "resampler")
     /// and value is a pair of model IR as string and weights as tensor.

@@ -17,6 +17,7 @@ namespace genai {
  * and value is a pair of model IR as string and weights as tensor.
  */
 using ModelsMap = std::map<std::string, std::pair<std::string, ov::Tensor>>;
+using DeviceMapping = std::map<std::string, std::string>;
 
 /**
  * @brief blob_path property defines a path to a directory containing compiled blobs previously exported with

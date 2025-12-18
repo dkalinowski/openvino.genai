@@ -221,6 +221,14 @@ InputsEmbedderInternVLChat::InputsEmbedderInternVLChat(
 
 InputsEmbedderInternVLChat::InputsEmbedderInternVLChat(
     const VLMConfig& vlm_config,
+    const std::filesystem::path& model_dir,
+    const DeviceMapping& device_mapping,
+    const ov::AnyMap text_device_config,
+    const ov::AnyMap vision_device_config) :
+    IInputsEmbedder(vlm_config, model_dir, device_mapping, text_device_config, vision_device_config) { }
+
+InputsEmbedderInternVLChat::InputsEmbedderInternVLChat(
+    const VLMConfig& vlm_config,
     const ModelsMap& models_map,
     const Tokenizer& tokenizer,
     const std::filesystem::path& config_dir_path,
