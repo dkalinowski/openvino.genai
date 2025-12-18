@@ -228,7 +228,7 @@ ov::genai::utils::GenerationFinishInfo get_lm_encoded_results(
         }
 
         if (m_embedding) {
-            constexpr bool return_remote_tensor = true;
+            constexpr bool return_remote_tensor = false;//true;
             CircularBufferQueueElementGuard<EmbeddingsRequest> embeddings_request_guard(m_embedding->get_request_queue().get());
             EmbeddingsRequest& req = embeddings_request_guard.get();
             const ov::Tensor& embed_prompt_tensor = m_embedding->infer(req, new_input_ids, return_remote_tensor);

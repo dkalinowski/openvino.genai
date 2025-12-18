@@ -155,6 +155,11 @@ public:
                 models_dir, "generation_config.json"
             )
         } {
+        std::cout << "Device mapping:" << std::endl;
+        for (const auto& [model_name, device_name] : device_mapping) {
+            std::cout << " " << model_name << ": " << device_name << std::endl;
+        }
+
         //m_is_npu = device.find("NPU") != std::string::npos;
         m_is_npu = is_llm_device_npu(device_mapping);
 
@@ -209,12 +214,6 @@ public:
         auto vision_embedder_properties = device_propertes.empty()
             ? properties_copy
             : utils::pop_or_default<ov::AnyMap>(device_propertes, device_mapping.at("vision_embeddings"), {});
-
-        // m_inputs_embedder = std::make_shared<InputsEmbedder>(models_dir, embedder_device, embedder_properties);
-        // m_tokenizer = m_inputs_embedder->get_tokenizer();
-        // m_embedding = m_inputs_embedder->get_embedding_model();
-        // // NPU is not supporting history, so in chat scenarios let's use full chat history on each iteration
-        // m_use_full_chat_history = m_is_npu;
 
         m_inputs_embedder = std::make_shared<InputsEmbedder>(models_dir, device_mapping, text_embedder_properties, vision_embedder_properties);
         m_tokenizer = m_inputs_embedder->get_tokenizer();
