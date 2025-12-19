@@ -124,10 +124,10 @@ public:
     virtual EncodedVideo encode_frames(const std::vector<ov::Tensor>& frames, const ov::AnyMap& config_map = {}) {
         OPENVINO_THROW("The current model does not support 'video' input, please use 'images' instead.");
     }
+
     /// @brief Reshape the vision encoder model if needed (dynamic shapes)
     /// @param model The model to reshape. By default does nothing.
     virtual void reshape(std::shared_ptr<ov::Model> model) {};
-
 
     /// @brief Gets processor config
     /// @return Processor config
@@ -140,6 +140,11 @@ protected:
     /// @brief A config to follow.
     ProcessorConfig m_processor_config;
 
+protected:
+    /// @brief Protected default constructor for derived classes that need custom initialization
+    VisionEncoder() = default;
+
+public:
     /// @brief Protected default constructor for derived classes that need custom initialization
     VisionEncoder() = default;
 

@@ -14,20 +14,9 @@ namespace ov::genai {
 
 class VisionEncoderInternVLChat : public VisionEncoder {
 public:
-    VisionEncoderInternVLChat(
-        const std::filesystem::path& model_dir,
-        const std::string& device,
-        const ov::AnyMap properties);
-
-    VisionEncoderInternVLChat(
-        const ModelsMap& models_map,
-        const std::filesystem::path& config_dir_path,
-        const std::string& device,
-        const ov::AnyMap device_config);
+    using VisionEncoder::VisionEncoder;
 
     EncodedImage encode(const ov::Tensor& image, const ov::AnyMap& config_map) override;
-
-    void reshape(std::shared_ptr<ov::Model> model) override;
 };
 
 class InputsEmbedderInternVLChat : public InputsEmbedder::IInputsEmbedder {

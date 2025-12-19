@@ -51,6 +51,22 @@ EmbeddingsModel::EmbeddingsModel(const std::filesystem::path& model_dir,
 
     ov::CompiledModel compiled_model = core.compile_model(m_model, device, properties);
     ov::genai::utils::print_compiled_model_properties(compiled_model, "text embeddings model");
+    std::cout << "Embeddings shape info:" << std::endl;
+    for (const auto& input : compiled_model.inputs()) {
+        // consider the shape might have dynamic dimensions
+        std::cout << " Input: " << input.get_any_name() << " shape: ";
+        for (const auto& dim : input.get_partial_shape()) {
+            std::cout << dim << " ";
+        }
+        std::cout << std::endl;
+    }
+    for (const auto& output : compiled_model.outputs()) {
+        std::cout << " Output: " << output.get_any_name() << " shape: ";
+        for (const auto& dim : output.get_partial_shape()) {
+            std::cout << dim << " ";
+        }
+        std::cout << std::endl;
+    }
     m_embeddings_requests_queue = init(compiled_model);
 }
 

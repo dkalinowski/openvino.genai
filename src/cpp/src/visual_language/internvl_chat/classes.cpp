@@ -13,6 +13,64 @@ namespace {
 
 std::string NATIVE_TAG = "<image>";
 
+struct SplitImageShape {
+    size_t batch_size;
+    size_t height;
+    size_t width;
+};
+
+SplitImageShape dry_split_image_internvl_shape_check(
+    int orig_height,
+    int orig_width,
+    int image_size,
+    int min_num = 1,
+    int max_num = 12,
+    bool use_thumbnail = true) {
+    float aspect_ratio = static_cast<float>(orig_width) / orig_height;
+
+    std::vector<std::pair<int, int>> target_ratios;
+    for (int n = min_num; n <= max_num; ++n) {
+        for (int i = 1; i <= n; ++i) {
+            for (int j = 1; j <= n; ++j) {
+                if (i * j <= max_num && i * j >= min_num) {
+                    target_ratios.emplace_back(i, j);
+                }
+            }
+        }
+    }
+    std::sort(target_ratios.begin(), target_ratios.end(),
+        [](const auto& a, const auto& b) { return a.first * a.second < b.first * b.second; });
+
+    auto find_closest_aspect_ratio = [&](float ar, const std::vector<std::pair<int, int>>& ratios) {
+        float best_ratio_diff = std::numeric_limits<float>::max();
+        std::pair<int, int> best_ratio = {1, 1};
+        int area = orig_width * orig_height;
+
+        for (const auto& ratio : ratios) {
+            float target_ar = static_cast<float>(ratio.first) / ratio.second;
+            float ratio_diff = std::abs(ar - target_ar);
+            if (ratio_diff < best_ratio_diff) {
+                best_ratio_diff = ratio_diff;
+                best_ratio = ratio;
+            } else if (ratio_diff == best_ratio_diff && area > 0.5 * image_size * image_size * ratio.first * ratio.second) {
+                best_ratio = ratio;
+            }
+        }
+        return best_ratio;
+    };
+
+    auto target_aspect_ratio = find_closest_aspect_ratio(aspect_ratio, target_ratios);
+
+    int blocks = target_aspect_ratio.first * target_aspect_ratio.second;
+    size_t batch_size = blocks;
+    
+    if (use_thumbnail && blocks != 1) {
+        batch_size += 1;
+    }
+
+    return {batch_size, static_cast<size_t>(image_size), static_cast<size_t>(image_size)};
+}
+
 std::vector<clip_image_u8> split_image_internvl(
     const clip_image_u8& image,
     int image_size,
@@ -118,6 +176,9 @@ ov::Tensor get_pixel_values_internvl(const ov::Tensor& image, const ProcessorCon
     size_t height = processed_images[0].ny;
     size_t width = processed_images[0].nx;
 
+    std::cout << "Processed " << batch_size << " images for InternVL Chat vision encoder." << std::endl;
+    std::cout << "Height: " << height << ", Width: " << width << std::endl;
+
     ov::Tensor output_tensor(ov::element::f32, {batch_size, channels, height, width});
     float* output_data = output_tensor.data<float>();
 
@@ -129,6 +190,59 @@ ov::Tensor get_pixel_values_internvl(const ov::Tensor& image, const ProcessorCon
 }
 
 } // namespace
+
+VisionEncoderInternVLChat::VisionEncoderInternVLChat(
+    const std::filesystem::path& model_dir,
+    const std::string& device,
+    const ov::AnyMap properties) {
+    m_processor_config = utils::from_config_json_if_exists<ProcessorConfig>(model_dir, "preprocessor_config.json");
+    auto model = utils::singleton_core().read_model(model_dir / "openvino_vision_embeddings_model.xml");
+    std::cout << "Proceeding with reshape..." << std::endl;
+    // Call reshape directly (not via virtual dispatch since we're in the constructor)
+    this->reshape(model);
+    auto compiled_model = utils::singleton_core().compile_model(model, device, properties);
+    ov::genai::utils::print_compiled_model_properties(compiled_model, "VLM vision embeddings model");
+    // print input shapes
+    std::cout << "Vision shape info:" << std::endl;
+    for (const auto& input : compiled_model.inputs()) {
+        std::cout << " Input: " << input.get_any_name() << " shape: ";
+        for (const auto& dim : input.get_partial_shape()) {
+            std::cout << dim << " ";
+        }
+        std::cout << std::endl;
+    }
+    for (const auto& output : compiled_model.outputs()) {
+        std::cout << " Output: " << output.get_any_name() << " shape: ";
+        for (const auto& dim : output.get_partial_shape()) {
+            std::cout << dim << " ";
+        }
+        std::cout << std::endl;
+    }
+    m_ireq_queue_vision_encoder = std::make_unique<CircularBufferQueue<ov::InferRequest>>(
+        compiled_model.get_property(ov::optimal_number_of_infer_requests),
+        [&compiled_model]() -> ov::InferRequest {
+            return compiled_model.create_infer_request();
+        });
+}
+
+VisionEncoderInternVLChat::VisionEncoderInternVLChat(
+    const ModelsMap& models_map,
+    const std::filesystem::path& config_dir_path,
+    const std::string& device,
+    const ov::AnyMap device_config) {
+    const auto& vision_encoder_model = utils::get_model_weights_pair(models_map, "vision_embeddings").first;
+    const auto& vision_encoder_weights = utils::get_model_weights_pair(models_map, "vision_embeddings").second;
+    // Note: This path doesn't load the model separately, so reshape is not applicable here
+    // The model is compiled directly from the models_map
+    auto compiled_model = utils::singleton_core().compile_model(vision_encoder_model, vision_encoder_weights, device, device_config);
+    ov::genai::utils::print_compiled_model_properties(compiled_model, "VLM vision embeddings model");
+    m_ireq_queue_vision_encoder = std::make_unique<CircularBufferQueue<ov::InferRequest>>(
+        compiled_model.get_property(ov::optimal_number_of_infer_requests),
+        [&compiled_model]() -> ov::InferRequest {
+            return compiled_model.create_infer_request();
+        });
+    m_processor_config = utils::from_config_json_if_exists<ProcessorConfig>(config_dir_path, "preprocessor_config.json");
+}
 
 EncodedImage VisionEncoderInternVLChat::encode(const ov::Tensor& image, const ov::AnyMap& config_map) {
     CircularBufferQueueElementGuard<ov::InferRequest> infer_request_guard(this->m_ireq_queue_vision_encoder.get());
@@ -147,6 +261,20 @@ EncodedImage VisionEncoderInternVLChat::encode(const ov::Tensor& image, const ov
     ImageSize resized_source_size{config.crop_size_height / config.patch_size, config.crop_size_width / config.patch_size};
 
     return {std::move(image_features), resized_source_size};
+}
+
+void VisionEncoderInternVLChat::reshape(std::shared_ptr<ov::Model> model) {
+    std::cout << "Reshaping InternVL Chat vision encoder model..." << std::endl;
+    // make use of dry_split_image_internvl_shape_check
+    auto shape_info = dry_split_image_internvl_shape_check(
+        /*orig_height=*/224,
+        /*orig_width=*/336,
+        /*image_size=*/m_processor_config.size_shortest_edge,
+        /*min_num=*/1,
+        /*max_num=*/12,
+        /*use_thumbnail=*/true);
+    ov::PartialShape input_shape = ov::PartialShape{shape_info.batch_size, 3, shape_info.height, shape_info.width};
+    model->reshape({{model->input().get_any_name(), input_shape}});
 }
 
 namespace {
