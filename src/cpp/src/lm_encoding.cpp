@@ -270,6 +270,9 @@ ov::genai::utils::GenerationFinishInfo get_lm_encoded_results(
         m_llm.wait();
 
         const auto infer_end = std::chrono::steady_clock::now();
+        std::cout << "Inference time (llm): "
+                  << PerfMetrics::get_microsec(infer_end - infer_start) / 1000.0
+                  << " ms" << std::endl;
         const auto infer_ms = PerfMetrics::get_microsec(infer_end - infer_start);
         raw_perf_counters.m_inference_durations[0] += MicroSeconds(infer_ms);
         raw_perf_counters.m_token_infer_durations.emplace_back(infer_ms);

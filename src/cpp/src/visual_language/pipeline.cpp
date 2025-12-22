@@ -189,11 +189,23 @@ public:
             //embedder_device = "CPU";
             utils::KVDesc kv_desc;
             update_npu_properties(models_dir, lm_properties);
+
+            // measure time
+            auto start_time = std::chrono::steady_clock::now();
             std::tie(compiled_language_model, kv_desc) = utils::compile_decoder_for_npu(language_model, lm_properties, kv_pos);
+            auto end_time = std::chrono::steady_clock::now();
+            auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+            std::cout << "Compilation time for language model on NPU: " << duration_ms << " ms" << std::endl;
+
             m_max_prompt_len = kv_desc.max_prompt_len;
             m_max_kv_cache_size = kv_desc.max_prompt_len + kv_desc.min_response_len;
         } else {
+            // Measure time
+            auto start_time = std::chrono::steady_clock::now();
             compiled_language_model = utils::singleton_core().compile_model(language_model, device_mapping.at("language"), lm_properties);
+            auto end_time = std::chrono::steady_clock::now();
+            auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+            std::cout << "Compilation time for language model on " << device_mapping.at("language") << ": " << duration_ms << " ms" << std::endl;
         }
         ov::genai::utils::print_compiled_model_properties(compiled_language_model, "VLM language model");
 
@@ -449,6 +461,9 @@ public:
             m_encoded_images.clear();
 
         auto generate_end_time = std::chrono::steady_clock::now();
+        std::cout << "Generation time: "
+                  << PerfMetrics::get_microsec(generate_end_time - generate_start_time) / 1000.0
+                  << " ms" << std::endl;
         decoded.perf_metrics = encoded_result.perf_metrics;
 
         // Common perf metrics

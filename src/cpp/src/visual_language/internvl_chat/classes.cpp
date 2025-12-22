@@ -197,10 +197,24 @@ VisionEncoderInternVLChat::VisionEncoderInternVLChat(
     const ov::AnyMap properties) {
     m_processor_config = utils::from_config_json_if_exists<ProcessorConfig>(model_dir, "preprocessor_config.json");
     auto model = utils::singleton_core().read_model(model_dir / "openvino_vision_embeddings_model.xml");
-    std::cout << "Proceeding with reshape..." << std::endl;
     // Call reshape directly (not via virtual dispatch since we're in the constructor)
-    this->reshape(model);
+    if (device.find("NPU") != std::string::npos) {
+        std::cout << "Proceeding with reshape..." << std::endl;
+        // Reshape only on NPU
+        // measure time
+        auto start_time = std::chrono::steady_clock::now();
+        this->reshape(model);
+        auto end_time = std::chrono::steady_clock::now();
+        auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+        std::cout << "Reshape time for InternVL Chat vision encoder on NPU: " << duration_ms << " ms" << std::endl;
+    }
+    // measure time
+    auto start_time = std::chrono::steady_clock::now();
     auto compiled_model = utils::singleton_core().compile_model(model, device, properties);
+    auto end_time = std::chrono::steady_clock::now();
+    auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+    std::cout << "Compilation time for InternVL Chat vision encoder on " << device << ": " << duration_ms << " ms" << std::endl;
+
     ov::genai::utils::print_compiled_model_properties(compiled_model, "VLM vision embeddings model");
     // print input shapes
     std::cout << "Vision shape info:" << std::endl;
@@ -247,16 +261,29 @@ VisionEncoderInternVLChat::VisionEncoderInternVLChat(
 EncodedImage VisionEncoderInternVLChat::encode(const ov::Tensor& image, const ov::AnyMap& config_map) {
     CircularBufferQueueElementGuard<ov::InferRequest> infer_request_guard(this->m_ireq_queue_vision_encoder.get());
     ov::InferRequest& encoder = infer_request_guard.get();
+    // measure preproc
+    auto start_time = std::chrono::steady_clock::now();
     ProcessorConfig config = utils::from_any_map(config_map, m_processor_config);
 
     ov::Tensor pixel_values = get_pixel_values_internvl(image, config);
+    auto end_time = std::chrono::steady_clock::now();
+    auto duration_us = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
+    std::cout << "Preprocessing time for InternVL Chat vision encoder: " << (float)duration_us / (float)1000 << " ms" << std::endl;
 
+    start_time = std::chrono::steady_clock::now();
     encoder.set_tensor("pixel_values", pixel_values);
     encoder.infer();
+    end_time = std::chrono::steady_clock::now();
+    duration_us = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
+    std::cout << "Inference time for InternVL Chat vision encoder: " << (float)duration_us / (float)1000 << " ms" << std::endl;
 
+    start_time = std::chrono::steady_clock::now();
     const ov::Tensor& infer_output = encoder.get_output_tensor();
     ov::Tensor image_features(infer_output.get_element_type(), infer_output.get_shape());
     std::memcpy(image_features.data(), infer_output.data(), infer_output.get_byte_size());
+    end_time = std::chrono::steady_clock::now();
+    duration_us = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
+    std::cout << "Postprocessing time for InternVL Chat vision encoder: " << (float)duration_us / (float)1000 << " ms" << std::endl;
 
     ImageSize resized_source_size{config.crop_size_height / config.patch_size, config.crop_size_width / config.patch_size};
 

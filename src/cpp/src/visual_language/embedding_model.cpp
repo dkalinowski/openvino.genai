@@ -49,7 +49,12 @@ EmbeddingsModel::EmbeddingsModel(const std::filesystem::path& model_dir,
     // apply embedding postprocessing step by merging them into the model
     merge_postprocess(m_model, scale_emb);
 
+    // measure time
+    auto start_time = std::chrono::steady_clock::now();
     ov::CompiledModel compiled_model = core.compile_model(m_model, device, properties);
+    auto end_time = std::chrono::steady_clock::now();
+    auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+    std::cout << "Compilation time for text embeddings model on " << device << ": " << duration_ms << " ms" << std::endl;
     ov::genai::utils::print_compiled_model_properties(compiled_model, "text embeddings model");
     std::cout << "Embeddings shape info:" << std::endl;
     for (const auto& input : compiled_model.inputs()) {
@@ -90,6 +95,8 @@ std::unique_ptr<CircularBufferQueue<EmbeddingsRequest>>& EmbeddingsModel::get_re
 
 ov::Tensor EmbeddingsModel::infer(EmbeddingsRequest& req, const ov::Tensor& input_idx, bool return_remote_tensor) {
     OPENVINO_ASSERT(req.ireq, "Text embeddings decoder model must be compiled first. Cannot infer non-compiled model");
+    // measure time
+    auto start_time = std::chrono::steady_clock::now();
     req.ireq.set_input_tensor(input_idx);
     if (return_remote_tensor) {
         req.ireq.set_output_tensor(req.remote_tensor);
@@ -97,6 +104,11 @@ ov::Tensor EmbeddingsModel::infer(EmbeddingsRequest& req, const ov::Tensor& inpu
         req.ireq.set_output_tensor(req.cpu_tensor);
     }
     req.ireq.infer();
+    auto end_time = std::chrono::steady_clock::now();
+    auto duration_us = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
+    static int infer_count = 0;
+    infer_count++;
+    std::cout << "Inference time for text embeddings model on infer #" << infer_count << ": " << (float)duration_us / (float)1000 << " ms" << std::endl;
     return req.ireq.get_output_tensor();
 }
 
