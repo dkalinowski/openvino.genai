@@ -315,6 +315,9 @@ InputsEmbedder::InputsEmbedder(const std::filesystem::path& model_dir,
     // } else {
     //     OPENVINO_THROW("Unsupported model type in VLM InputsEmbedder class. Please, create feature request on new model support");
     // }
+
+    // Remaining classes implementation will follow once api change suggestion is approved
+
     if (vlm_config.model_type == VLMModelType::INTERNVL_CHAT) {
         m_impl = std::make_shared<InputsEmbedderInternVLChat>(vlm_config, model_dir, device_mapping, text_device_config, vision_device_config);
     } else {

@@ -79,14 +79,15 @@ ContinuousBatchingPipeline::ContinuousBatchingPipeline( const std::filesystem::p
 
 ContinuousBatchingPipeline::ContinuousBatchingPipeline( const std::filesystem::path& models_path,
                                                         const SchedulerConfig& scheduler_config,
-                                                        const DeviceMapping& device_mapping,
+                                                        const DeviceMapping& device_mapping,  // per-model device names: language/vision_embeddings/text_embeddings
                                                         const ov::AnyMap& properties,
                                                         const ov::AnyMap& tokenizer_properties,
                                                         const ov::AnyMap& vision_encoder_properties) {
-    std::cout << "My constructor called!" << std::endl;
+    // Device mapping contains per-model device names
     OPENVINO_ASSERT(device_mapping.find("language") != device_mapping.end(),
         "Device mapping must contain 'language' key");
     auto language_device = device_mapping.at("language");
+
     auto start_time = std::chrono::steady_clock::now();
     auto properties_without_draft_model = properties;
     auto draft_model_desr = utils::extract_draft_model_from_config(properties_without_draft_model);
@@ -100,8 +101,8 @@ ContinuousBatchingPipeline::ContinuousBatchingPipeline( const std::filesystem::p
 
     std::shared_ptr<InputsEmbedder> embedder;
     if (std::filesystem::exists(models_path / "openvino_text_embeddings_model.xml")) {
-        //embedder = std::make_shared<InputsEmbedder>(models_path, device, vision_encoder_properties);
-        embedder = std::make_shared<InputsEmbedder>(models_path, device_mapping, properties/*? should be text embedd*/, vision_encoder_properties);
+        //embedder = std::make_shared<InputsEmbedder>(models_path, device, vision_encoder_properties);  // previously used single device for embedder
+        embedder = std::make_shared<InputsEmbedder>(models_path, device_mapping, properties/*? should be text embedd properties only*/, vision_encoder_properties);  // new version with per-model devices, mapping is used underneath to deduce which device
     }
 
     utils::print_scheduler_config_info(scheduler_config);

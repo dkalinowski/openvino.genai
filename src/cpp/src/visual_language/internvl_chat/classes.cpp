@@ -19,7 +19,10 @@ struct SplitImageShape {
     size_t width;
 };
 
-SplitImageShape dry_split_image_internvl_shape_check(
+// Function to determine how to split the image based on its aspect ratio
+// Each VLM model class should have similar implementation in order to deduce static shape for Vision Encoder
+// Used during reshape in case Vision Encoder is on NPU device
+SplitImageShape deduce_model_static_shape_from_resolution(
     int orig_height,
     int orig_width,
     int image_size,
@@ -197,17 +200,18 @@ VisionEncoderInternVLChat::VisionEncoderInternVLChat(
     const ov::AnyMap properties) {
     m_processor_config = utils::from_config_json_if_exists<ProcessorConfig>(model_dir, "preprocessor_config.json");
     auto model = utils::singleton_core().read_model(model_dir / "openvino_vision_embeddings_model.xml");
-    // Call reshape directly (not via virtual dispatch since we're in the constructor)
+
+    // In case the device is NPU, we need to reshape to static shape
+    // In final version the shapes could be taken from properties or from preprocessor_config?
     if (device.find("NPU") != std::string::npos) {
         std::cout << "Proceeding with reshape..." << std::endl;
-        // Reshape only on NPU
-        // measure time
         auto start_time = std::chrono::steady_clock::now();
-        this->reshape(model);
+        this->reshape(model);  // Each class should have its own reshape implementation
         auto end_time = std::chrono::steady_clock::now();
         auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
         std::cout << "Reshape time for InternVL Chat vision encoder on NPU: " << duration_ms << " ms" << std::endl;
     }
+
     // measure time
     auto start_time = std::chrono::steady_clock::now();
     auto compiled_model = utils::singleton_core().compile_model(model, device, properties);
@@ -216,6 +220,7 @@ VisionEncoderInternVLChat::VisionEncoderInternVLChat(
     std::cout << "Compilation time for InternVL Chat vision encoder on " << device << ": " << duration_ms << " ms" << std::endl;
 
     ov::genai::utils::print_compiled_model_properties(compiled_model, "VLM vision embeddings model");
+
     // print input shapes
     std::cout << "Vision shape info:" << std::endl;
     for (const auto& input : compiled_model.inputs()) {
@@ -261,7 +266,7 @@ VisionEncoderInternVLChat::VisionEncoderInternVLChat(
 EncodedImage VisionEncoderInternVLChat::encode(const ov::Tensor& image, const ov::AnyMap& config_map) {
     CircularBufferQueueElementGuard<ov::InferRequest> infer_request_guard(this->m_ireq_queue_vision_encoder.get());
     ov::InferRequest& encoder = infer_request_guard.get();
-    // measure preproc
+    // Measurements for POC purposes, ignore all newly added timing code
     auto start_time = std::chrono::steady_clock::now();
     ProcessorConfig config = utils::from_any_map(config_map, m_processor_config);
 
@@ -292,8 +297,9 @@ EncodedImage VisionEncoderInternVLChat::encode(const ov::Tensor& image, const ov
 
 void VisionEncoderInternVLChat::reshape(std::shared_ptr<ov::Model> model) {
     std::cout << "Reshaping InternVL Chat vision encoder model..." << std::endl;
-    // make use of dry_split_image_internvl_shape_check
-    auto shape_info = dry_split_image_internvl_shape_check(
+
+    // For now the reshape is always to 224x336, but in final version it could be taken from properties or preprocessor_config
+    auto shape_info = deduce_model_static_shape_from_resolution(
         /*orig_height=*/224,
         /*orig_width=*/336,
         /*image_size=*/m_processor_config.size_shortest_edge,

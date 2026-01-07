@@ -20,35 +20,13 @@
 namespace ov::genai {
     
 VisionEncoder::VisionEncoder(const std::filesystem::path& model_dir, const std::string& device, const ov::AnyMap properties) {
-    m_processor_config = utils::from_config_json_if_exists<ProcessorConfig>(model_dir, "preprocessor_config.json");
-    auto model = utils::singleton_core().read_model(model_dir / "openvino_vision_embeddings_model.xml");
-    std::cout << "Proceeding with reshape..." << std::endl;
-    this->reshape(model);
-    auto compiled_model = utils::singleton_core().compile_model(model, device, properties);
-    ov::genai::utils::print_compiled_model_properties(compiled_model, "VLM vision embeddings model");
-    // print input shapes
-    // 224 x 336 (h/w)
-    std::cout << "Vision shape info:" << std::endl;
-    for (const auto& input : compiled_model.inputs()) {
-        // consider the shape might have dynamic dimensions
-        std::cout << " Input: " << input.get_any_name() << " shape: ";
-        for (const auto& dim : input.get_partial_shape()) {
-            std::cout << dim << " ";
-        }
-        std::cout << std::endl;
-    }
-    for (const auto& output : compiled_model.outputs()) {
-        std::cout << " Output: " << output.get_any_name() << " shape: ";
-        for (const auto& dim : output.get_partial_shape()) {
-            std::cout << dim << " ";
-        }
-        std::cout << std::endl;
-    }
+    auto compiled_model = utils::singleton_core().compile_model(model_dir / "openvino_vision_embeddings_model.xml", device, properties);
     m_ireq_queue_vision_encoder = std::make_unique<CircularBufferQueue<ov::InferRequest>>(
         compiled_model.get_property(ov::optimal_number_of_infer_requests),
         [&compiled_model]() -> ov::InferRequest {
             return compiled_model.create_infer_request();
         });
+    m_processor_config = utils::from_config_json_if_exists<ProcessorConfig>(model_dir, "preprocessor_config.json");
 }
 
 VisionEncoder::VisionEncoder(

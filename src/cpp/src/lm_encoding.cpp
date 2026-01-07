@@ -228,6 +228,9 @@ ov::genai::utils::GenerationFinishInfo get_lm_encoded_results(
         }
 
         if (m_embedding) {
+            // Here this change is required whenever text embeddings model is on different device than LLM
+            // For POC purposes I simply enforce copy to CPU, however in final version we could deduce it somehow
+            // If we dont want to deduce it - the tensor is usually small (1 x embeddings_dim) so copy overhead between devices could be negligible?
             constexpr bool return_remote_tensor = false;//true;
             CircularBufferQueueElementGuard<EmbeddingsRequest> embeddings_request_guard(m_embedding->get_request_queue().get());
             EmbeddingsRequest& req = embeddings_request_guard.get();
