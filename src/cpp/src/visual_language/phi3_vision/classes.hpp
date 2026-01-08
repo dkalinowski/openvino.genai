@@ -8,7 +8,7 @@
 #include "visual_language/vlm_config.hpp"
 
 #include "visual_language/vision_encoder_impl.hpp"
-#include "visual_language/inputs_embedder.hpp"
+#include "visual_language/inputs_embedder_impl.hpp"
 
 namespace ov::genai {
 
@@ -42,7 +42,7 @@ public:
     EncodedImage encode(const ov::Tensor& image, const ov::AnyMap& config_map) override;
 };
 
-class InputsEmbedderPhi3V : public InputsEmbedder::IInputsEmbedder {
+class InputsEmbedderPhi3V : public InputsEmbedderImpl::IInputsEmbedder {
 public:
     InputsEmbedderPhi3V(
         const VLMConfig& vlm_config,

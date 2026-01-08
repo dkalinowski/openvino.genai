@@ -86,7 +86,7 @@ ContinuousBatchingPipeline::ContinuousBatchingImpl::ContinuousBatchingImpl(
 
 ContinuousBatchingPipeline::ContinuousBatchingImpl::ContinuousBatchingImpl(
     const std::shared_ptr<ov::Model>& model,
-    std::shared_ptr<InputsEmbedder> inputs_embedder,
+    std::shared_ptr<InputsEmbedderImpl> inputs_embedder,
     const Tokenizer& tokenizer,
     const SchedulerConfig& scheduler_config,
     const std::string& device,

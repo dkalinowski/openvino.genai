@@ -10,7 +10,7 @@
 #include "openvino/genai/text_streamer.hpp"
 
 #include "visual_language/vlm_config.hpp"
-#include "visual_language/inputs_embedder.hpp"
+#include "visual_language/inputs_embedder_impl.hpp"
 #include "visual_language/embedding_model_impl.hpp"
 #include "visual_language/pipeline_base.hpp"
 #include "visual_language/continuous_batching_adapter.hpp"
@@ -60,8 +60,8 @@ class VLMPipeline::VLMPipelineImpl : public VLMPipelineBase{
     // True if chat mode is activated to save conversation
     // history between generate() calls.
     bool m_is_chat_conversation = false;
-    // InputsEmbedder
-    std::shared_ptr<InputsEmbedder> m_inputs_embedder;
+    // InputsEmbedderImpl
+    std::shared_ptr<InputsEmbedderImpl> m_inputs_embedder;
     // Component for applying sampling to lm outputs
     Sampler m_sampler;
     size_t m_max_prompt_len = std::numeric_limits<size_t>::max();
@@ -127,7 +127,7 @@ public:
             ? properties_copy
             : utils::pop_or_default<ov::AnyMap>(device_propertes, embedder_device, {});
 
-        m_inputs_embedder = std::make_shared<InputsEmbedder>(models_dir, embedder_device, embedder_properties);
+        m_inputs_embedder = std::make_shared<InputsEmbedderImpl>(models_dir, embedder_device, embedder_properties);
         m_tokenizer = m_inputs_embedder->get_tokenizer();
         m_embedding = m_inputs_embedder->get_embedding_model();
         // NPU is not supporting history, so in chat scenarios let's use full chat history on each iteration
@@ -227,7 +227,7 @@ public:
             ? properties_copy
             : utils::pop_or_default<ov::AnyMap>(device_propertes, device_mapping.at("vision_embeddings"), {});
 
-        m_inputs_embedder = std::make_shared<InputsEmbedder>(models_dir, device_mapping, text_embedder_properties, vision_embedder_properties);
+        m_inputs_embedder = std::make_shared<InputsEmbedderImpl>(models_dir, device_mapping, text_embedder_properties, vision_embedder_properties);
         m_tokenizer = m_inputs_embedder->get_tokenizer();
         m_embedding = m_inputs_embedder->get_embedding_model();
         // NPU is not supporting history, so in chat scenarios let's use full chat history on each iteration
@@ -258,7 +258,7 @@ public:
         OPENVINO_ASSERT(!m_is_npu,
             "VLMPipeline initialization from string isn't supported for NPU device");
 
-        m_inputs_embedder = std::make_shared<InputsEmbedder>(models_map, tokenizer, config_dir_path, device, properties);
+        m_inputs_embedder = std::make_shared<InputsEmbedderImpl>(models_map, tokenizer, config_dir_path, device, properties);
 
         m_tokenizer = m_inputs_embedder->get_tokenizer();
         m_embedding = m_inputs_embedder->get_embedding_model();

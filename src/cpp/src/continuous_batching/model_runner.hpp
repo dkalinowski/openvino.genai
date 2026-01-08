@@ -49,7 +49,7 @@ class ModelRunner {
     // Output shape: [1, conversation length, hidden_size].
     EmbeddingsModelImpl::Ptr m_embedding;
 
-    std::shared_ptr<InputsEmbedder> m_inputs_embedder;
+    std::shared_ptr<InputsEmbedderImpl> m_inputs_embedder;
 
     // Cached pre-allocated tensors to avoid CPU->GPU copy
     ov::Tensor m_cached_input_ids;
@@ -107,7 +107,7 @@ public:
         return m_request;
     }
 
-    void set_inputs_embedder(const std::shared_ptr<InputsEmbedder>& inputs_embedder) {
+    void set_inputs_embedder(const std::shared_ptr<InputsEmbedderImpl>& inputs_embedder) {
         m_inputs_embedder = inputs_embedder;
         m_embedding = inputs_embedder->get_embedding_model();
     }

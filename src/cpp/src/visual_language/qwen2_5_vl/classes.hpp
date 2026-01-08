@@ -8,7 +8,7 @@
 #include "visual_language/vlm_config.hpp"
 
 #include "visual_language/vision_encoder_impl.hpp"
-#include "visual_language/inputs_embedder.hpp"
+#include "visual_language/inputs_embedder_impl.hpp"
 #include "visual_language/qwen2vl/classes.hpp"
 
 namespace ov::genai {

@@ -7,7 +7,7 @@
 
 #include "openvino/genai/lora_adapter.hpp"
 #include "continuous_batching/cache_eviction.hpp"
-#include "visual_language/inputs_embedder.hpp"
+#include "visual_language/inputs_embedder_impl.hpp"
 
 namespace ov::genai {
 
@@ -108,7 +108,7 @@ public:
                            bool is_validation_mode_enabled = false);
 
     ContinuousBatchingImpl(const std::shared_ptr<ov::Model>& model,
-                           std::shared_ptr<InputsEmbedder> inputs_embedder,
+                           std::shared_ptr<InputsEmbedderImpl> inputs_embedder,
                            const Tokenizer& tokenizer,
                            const SchedulerConfig& scheduler_config,
                            const std::string& device,

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "openvino/genai/visual_language/perf_metrics.hpp"
-#include "visual_language/inputs_embedder.hpp"
+#include "visual_language/inputs_embedder_impl.hpp"
 
 #include "visual_language/clip.hpp"
 #include "visual_language/vision_encoder_impl.hpp"
@@ -24,19 +24,19 @@
 
 namespace ov::genai {
 
-// Base InputsEmbedder class
+// Base InputsEmbedderImpl class
 
-std::pair<ov::Tensor, std::optional<int64_t>> InputsEmbedder::IInputsEmbedder::get_position_ids(const size_t inputs_embeds_size, const size_t history_size) {
+std::pair<ov::Tensor, std::optional<int64_t>> InputsEmbedderImpl::IInputsEmbedder::get_position_ids(const size_t inputs_embeds_size, const size_t history_size) {
     ov::Tensor position_ids = ov::Tensor{ov::element::i64, { 1, inputs_embeds_size }};
     std::iota(position_ids.data<int64_t>(), position_ids.data<int64_t>() + position_ids.get_size(), history_size);
     return {position_ids, std::nullopt};
 }
 
-std::pair<ov::Tensor, std::optional<int64_t>> InputsEmbedder::IInputsEmbedder::get_generation_phase_position_ids(const size_t inputs_embeds_size, const size_t history_size, int64_t rope_delta) {
+std::pair<ov::Tensor, std::optional<int64_t>> InputsEmbedderImpl::IInputsEmbedder::get_generation_phase_position_ids(const size_t inputs_embeds_size, const size_t history_size, int64_t rope_delta) {
     return get_position_ids(inputs_embeds_size, history_size);
 }
 
-void InputsEmbedder::IInputsEmbedder::start_chat(const std::string& system_message) {
+void InputsEmbedderImpl::IInputsEmbedder::start_chat(const std::string& system_message) {
     m_is_chat_conversation = true;
     if (!m_kv_cache_state.get_state().empty()) {
         m_kv_cache_state.reset_state();
@@ -46,7 +46,7 @@ void InputsEmbedder::IInputsEmbedder::start_chat(const std::string& system_messa
     }
 }
 
-void InputsEmbedder::IInputsEmbedder::update_chat_history(const std::string& decoded_results, const ov::genai::GenerationStatus generation_finish_status) {
+void InputsEmbedderImpl::IInputsEmbedder::update_chat_history(const std::string& decoded_results, const ov::genai::GenerationStatus generation_finish_status) {
     m_kv_cache_state.num_tokens_to_trim = 0;
     if (generation_finish_status == ov::genai::GenerationStatus::CANCEL) {
         // If chat generation process was cancelled by user, let's rollback to previous state of kv cache
@@ -58,12 +58,12 @@ void InputsEmbedder::IInputsEmbedder::update_chat_history(const std::string& dec
     }
 }
 
-void InputsEmbedder::IInputsEmbedder::finish_chat() {
+void InputsEmbedderImpl::IInputsEmbedder::finish_chat() {
     m_is_chat_conversation = false;
     m_kv_cache_state.reset_state();
 }
 
-InputsEmbedder::IInputsEmbedder::IInputsEmbedder(
+InputsEmbedderImpl::IInputsEmbedder::IInputsEmbedder(
         const VLMConfig& vlm_config,
         const std::filesystem::path& model_dir,
         const std::string& device,
@@ -73,7 +73,7 @@ InputsEmbedder::IInputsEmbedder::IInputsEmbedder(
     m_embedding(EmbeddingsModelImpl::create(model_dir, m_vlm_config.scale_emb, device, device_config)),
     m_tokenizer{model_dir, device_config} { }
 
-InputsEmbedder::IInputsEmbedder::IInputsEmbedder(
+InputsEmbedderImpl::IInputsEmbedder::IInputsEmbedder(
         const VLMConfig& vlm_config,
         const std::filesystem::path& model_dir,
         const DeviceMapping& device_mapping,
@@ -84,7 +84,7 @@ InputsEmbedder::IInputsEmbedder::IInputsEmbedder(
     m_embedding(EmbeddingsModelImpl::create(model_dir, m_vlm_config.scale_emb, device_mapping.at("text_embeddings"), text_device_config)),
     m_tokenizer{model_dir, text_device_config} { }
 
-InputsEmbedder::IInputsEmbedder::IInputsEmbedder(
+InputsEmbedderImpl::IInputsEmbedder::IInputsEmbedder(
         const VLMConfig& vlm_config,
         const ModelsMap& models_map,
         const Tokenizer& tokenizer,
@@ -108,7 +108,7 @@ InputsEmbedder::IInputsEmbedder::IInputsEmbedder(
     )),
     m_tokenizer(tokenizer) { }
 
-ov::Tensor InputsEmbedder::IInputsEmbedder::apply_chat_template_tokenize(const std::string& prompt, ov::genai::VLMPerfMetrics& metrics) {
+ov::Tensor InputsEmbedderImpl::IInputsEmbedder::apply_chat_template_tokenize(const std::string& prompt, ov::genai::VLMPerfMetrics& metrics) {
     bool add_special_tokens = m_add_special_tokens_is_set ? m_add_special_tokens : !(m_is_chat_conversation || m_apply_chat_template);
     if (m_is_chat_conversation) {
         std::string prompt_to_encode = prompt;
@@ -136,7 +136,7 @@ ov::Tensor InputsEmbedder::IInputsEmbedder::apply_chat_template_tokenize(const s
     }
 }
 
-ov::Tensor InputsEmbedder::IInputsEmbedder::update_history(const ov::Tensor& new_chat_tokens) {
+ov::Tensor InputsEmbedderImpl::IInputsEmbedder::update_history(const ov::Tensor& new_chat_tokens) {
     ov::Tensor encoded_inputs;
     if (m_is_chat_conversation) {
         ov::genai::align_kv_cache_and_history(new_chat_tokens, m_kv_cache_state);
@@ -148,7 +148,7 @@ ov::Tensor InputsEmbedder::IInputsEmbedder::update_history(const ov::Tensor& new
     return encoded_inputs;
 }
 
-ov::Tensor InputsEmbedder::IInputsEmbedder::get_encoded_input_ids(const std::string& prompt, ov::genai::VLMPerfMetrics& metrics) {
+ov::Tensor InputsEmbedderImpl::IInputsEmbedder::get_encoded_input_ids(const std::string& prompt, ov::genai::VLMPerfMetrics& metrics) {
     const auto new_chat_tokens = apply_chat_template_tokenize(prompt, metrics);
     auto new_input_ids = update_history(new_chat_tokens);
     m_prev_hist_length = m_kv_cache_state.get_state().size();
@@ -157,7 +157,7 @@ ov::Tensor InputsEmbedder::IInputsEmbedder::get_encoded_input_ids(const std::str
     return new_input_ids;
 }
 
-std::vector<ov::Tensor> InputsEmbedder::IInputsEmbedder::to_single_image_tensors(const std::vector<ov::Tensor>& images) {
+std::vector<ov::Tensor> InputsEmbedderImpl::IInputsEmbedder::to_single_image_tensors(const std::vector<ov::Tensor>& images) {
     std::vector<ov::Tensor> single_image_tensors;
     for (const auto& image : images) {
         ov::Tensor reshaped_image = image;
@@ -182,7 +182,7 @@ std::vector<ov::Tensor> InputsEmbedder::IInputsEmbedder::to_single_image_tensors
     return single_image_tensors;
 }
 
-std::vector<ov::genai::EncodedImage> InputsEmbedder::IInputsEmbedder::encode_images(const std::vector<ov::Tensor>& images) {
+std::vector<ov::genai::EncodedImage> InputsEmbedderImpl::IInputsEmbedder::encode_images(const std::vector<ov::Tensor>& images) {
     std::vector<EncodedImage> embeds;
     std::vector<ov::Tensor> single_images = to_single_image_tensors(images);
     for (const ov::Tensor& image : single_images) {
@@ -191,7 +191,7 @@ std::vector<ov::genai::EncodedImage> InputsEmbedder::IInputsEmbedder::encode_ima
     return embeds;
 }
 
-ov::Tensor InputsEmbedder::IInputsEmbedder::get_inputs_embeds(
+ov::Tensor InputsEmbedderImpl::IInputsEmbedder::get_inputs_embeds(
     const std::string& prompt,
     const std::vector<ov::genai::EncodedImage>& images,
     const std::vector<ov::genai::EncodedVideo>& videos,
@@ -206,14 +206,14 @@ ov::Tensor InputsEmbedder::IInputsEmbedder::get_inputs_embeds(
     OPENVINO_THROW("Current model doesn't support video preprocess currently. Input images are processed as separate images.");
 }
 
-std::vector<ov::genai::EncodedVideo> InputsEmbedder::IInputsEmbedder::encode_videos(const std::vector<ov::Tensor>& videos) {
+std::vector<ov::genai::EncodedVideo> InputsEmbedderImpl::IInputsEmbedder::encode_videos(const std::vector<ov::Tensor>& videos) {
     if (!videos.size()) {
         return {};
     }
     OPENVINO_THROW("Current model doesn't support video preprocess currently. Input images are processed as separate images.");
 }
 
-NormalizedPrompt InputsEmbedder::IInputsEmbedder::normalize_prompt(
+NormalizedPrompt InputsEmbedderImpl::IInputsEmbedder::normalize_prompt(
     const std::string& prompt,
     size_t base_image_id,
     size_t base_video_id,
@@ -225,7 +225,7 @@ NormalizedPrompt InputsEmbedder::IInputsEmbedder::normalize_prompt(
     OPENVINO_THROW("Current model doesn't support video preprocess currently. Input images are processed as separate images.");
 }
 
-std::pair<ov::Tensor, ov::Tensor> InputsEmbedder::IInputsEmbedder::get_inputs_embeds_with_token_type_ids(
+std::pair<ov::Tensor, ov::Tensor> InputsEmbedderImpl::IInputsEmbedder::get_inputs_embeds_with_token_type_ids(
     const std::string& prompt,
     const std::vector<EncodedImage>& images,
     VLMPerfMetrics& metrics,
@@ -234,7 +234,7 @@ std::pair<ov::Tensor, ov::Tensor> InputsEmbedder::IInputsEmbedder::get_inputs_em
     OPENVINO_THROW("This model does not support token_type_ids.");
 }
 
-std::pair<ov::Tensor, ov::Tensor> InputsEmbedder::IInputsEmbedder::get_inputs_embeds_with_token_type_ids(
+std::pair<ov::Tensor, ov::Tensor> InputsEmbedderImpl::IInputsEmbedder::get_inputs_embeds_with_token_type_ids(
     const std::string& prompt,
     const std::vector<EncodedImage>& images,
     const std::vector<EncodedVideo>& videos,
@@ -248,11 +248,11 @@ std::pair<ov::Tensor, ov::Tensor> InputsEmbedder::IInputsEmbedder::get_inputs_em
     return get_inputs_embeds_with_token_type_ids(prompt, images, metrics, recalculate_merged_embeddings, image_sequence);
 }
 
-bool InputsEmbedder::IInputsEmbedder::has_token_type_ids() const { return false; }
+bool InputsEmbedderImpl::IInputsEmbedder::has_token_type_ids() const { return false; }
 
 /// Public InputsEmbedder class
 
-InputsEmbedder::InputsEmbedder(const std::filesystem::path& model_dir,
+InputsEmbedderImpl::InputsEmbedderImpl(const std::filesystem::path& model_dir,
                                const std::string& device,
                                const ov::AnyMap device_config) {
     auto vlm_config = utils::from_config_json_if_exists<VLMConfig>(model_dir, "config.json");
@@ -284,7 +284,7 @@ InputsEmbedder::InputsEmbedder(const std::filesystem::path& model_dir,
     }
 }
 
-InputsEmbedder::InputsEmbedder(const std::filesystem::path& model_dir,
+InputsEmbedderImpl::InputsEmbedderImpl(const std::filesystem::path& model_dir,
                                const DeviceMapping& device_mapping,
                                const ov::AnyMap text_device_config,
                                const ov::AnyMap vision_device_config) {
@@ -325,7 +325,7 @@ InputsEmbedder::InputsEmbedder(const std::filesystem::path& model_dir,
     }
 }
 
-InputsEmbedder::InputsEmbedder(const ModelsMap& models_map,
+InputsEmbedderImpl::InputsEmbedderImpl(const ModelsMap& models_map,
                                const Tokenizer& tokenizer,
                                const std::filesystem::path& config_dir_path,
                                const std::string& device,
@@ -359,11 +359,11 @@ InputsEmbedder::InputsEmbedder(const ModelsMap& models_map,
     }
 }
 
-ov::Tensor InputsEmbedder::get_inputs_embeds(const std::string& prompt, const std::vector<ov::genai::EncodedImage>& images, ov::genai::VLMPerfMetrics& metrics, bool recalculate_merged_embeddings, const std::vector<size_t>& image_sequence) {
+ov::Tensor InputsEmbedderImpl::get_inputs_embeds(const std::string& prompt, const std::vector<ov::genai::EncodedImage>& images, ov::genai::VLMPerfMetrics& metrics, bool recalculate_merged_embeddings, const std::vector<size_t>& image_sequence) {
     return m_impl->get_inputs_embeds(prompt, images, metrics, recalculate_merged_embeddings, image_sequence);
 }
 
-ov::Tensor InputsEmbedder::get_inputs_embeds(const std::string& prompt,
+ov::Tensor InputsEmbedderImpl::get_inputs_embeds(const std::string& prompt,
                                              const std::vector<ov::genai::EncodedImage>& images,
                                              const std::vector<ov::genai::EncodedVideo>& videos,
                                              ov::genai::VLMPerfMetrics& metrics,
@@ -381,7 +381,7 @@ ov::Tensor InputsEmbedder::get_inputs_embeds(const std::string& prompt,
                                      history_vision_count);
 }
 
-std::pair<ov::Tensor, ov::Tensor> InputsEmbedder::get_inputs_embeds_with_token_type_ids(
+std::pair<ov::Tensor, ov::Tensor> InputsEmbedderImpl::get_inputs_embeds_with_token_type_ids(
     const std::string& prompt,
     const std::vector<EncodedImage>& images,
     VLMPerfMetrics& metrics,
@@ -391,7 +391,7 @@ std::pair<ov::Tensor, ov::Tensor> InputsEmbedder::get_inputs_embeds_with_token_t
         prompt, images, metrics, recalculate_merged_embeddings, image_sequence);
 }
 
-std::pair<ov::Tensor, ov::Tensor> InputsEmbedder::get_inputs_embeds_with_token_type_ids(
+std::pair<ov::Tensor, ov::Tensor> InputsEmbedderImpl::get_inputs_embeds_with_token_type_ids(
     const std::string& prompt,
     const std::vector<EncodedImage>& images,
     const std::vector<EncodedVideo>& videos,
@@ -410,63 +410,63 @@ std::pair<ov::Tensor, ov::Tensor> InputsEmbedder::get_inputs_embeds_with_token_t
                                                          history_vision_count);
 }
 
-bool InputsEmbedder::has_token_type_ids() const {
+bool InputsEmbedderImpl::has_token_type_ids() const {
     return m_impl->has_token_type_ids();
 }
 
-std::vector<ov::genai::EncodedImage> InputsEmbedder::encode_images(const std::vector<ov::Tensor>& images) {
+std::vector<ov::genai::EncodedImage> InputsEmbedderImpl::encode_images(const std::vector<ov::Tensor>& images) {
     return m_impl->encode_images(images);
 }
 
-std::vector<ov::genai::EncodedVideo> InputsEmbedder::encode_videos(const std::vector<ov::Tensor>& videos) {
+std::vector<ov::genai::EncodedVideo> InputsEmbedderImpl::encode_videos(const std::vector<ov::Tensor>& videos) {
     return m_impl->encode_videos(videos);
 }
 
-std::pair<ov::Tensor, std::optional<int64_t>> InputsEmbedder::get_position_ids(const size_t inputs_embeds_size, const size_t history_size) {
+std::pair<ov::Tensor, std::optional<int64_t>> InputsEmbedderImpl::get_position_ids(const size_t inputs_embeds_size, const size_t history_size) {
     return m_impl->get_position_ids(inputs_embeds_size, history_size);
 }
 
-void InputsEmbedder::set_position_ids(const ov::Tensor& position_ids) {
+void InputsEmbedderImpl::set_position_ids(const ov::Tensor& position_ids) {
     m_impl->set_position_ids(position_ids);
 }
 
-void InputsEmbedder::set_rope_delta(int64_t rope_delta) {
+void InputsEmbedderImpl::set_rope_delta(int64_t rope_delta) {
     m_impl->set_rope_delta(rope_delta);
 }
 
-std::pair<ov::Tensor, std::optional<int64_t>> InputsEmbedder::get_generation_phase_position_ids(const size_t inputs_embeds_size, const size_t history_size, int64_t rope_delta) {
+std::pair<ov::Tensor, std::optional<int64_t>> InputsEmbedderImpl::get_generation_phase_position_ids(const size_t inputs_embeds_size, const size_t history_size, int64_t rope_delta) {
     return m_impl->get_generation_phase_position_ids(inputs_embeds_size, history_size, rope_delta);
 }
 
-EmbeddingsModelImpl::Ptr InputsEmbedder::get_embedding_model() const {
+EmbeddingsModelImpl::Ptr InputsEmbedderImpl::get_embedding_model() const {
     return m_impl->get_embedding_model();
 }
 
-ov::genai::utils::KVCacheState& InputsEmbedder::get_kv_cache_state() {
+ov::genai::utils::KVCacheState& InputsEmbedderImpl::get_kv_cache_state() {
     return  m_impl->get_kv_cache_state();
 }
 
-Tokenizer InputsEmbedder::get_tokenizer() const {
+Tokenizer InputsEmbedderImpl::get_tokenizer() const {
     return m_impl->get_tokenizer();
 }
 
-void InputsEmbedder::start_chat(const std::string& system_message) {
+void InputsEmbedderImpl::start_chat(const std::string& system_message) {
     return m_impl->start_chat(system_message);
 }
 
-void InputsEmbedder::update_chat_history(const std::string& decoded_results, const ov::genai::GenerationStatus generation_finish_status) {
+void InputsEmbedderImpl::update_chat_history(const std::string& decoded_results, const ov::genai::GenerationStatus generation_finish_status) {
     return m_impl->update_chat_history(decoded_results, generation_finish_status);
 }
 
-void InputsEmbedder::set_apply_chat_template_status(bool apply_chat_template) {
+void InputsEmbedderImpl::set_apply_chat_template_status(bool apply_chat_template) {
     return m_impl->set_apply_chat_template_status(apply_chat_template);
 }
 
-void InputsEmbedder::finish_chat() {
+void InputsEmbedderImpl::finish_chat() {
     return m_impl->finish_chat();
 }
 
-NormalizedPrompt InputsEmbedder::normalize_prompt(
+NormalizedPrompt InputsEmbedderImpl::normalize_prompt(
     const std::string& prompt,
     size_t base_id,
     const std::vector<EncodedImage>& images
@@ -475,7 +475,7 @@ NormalizedPrompt InputsEmbedder::normalize_prompt(
     return {norm_prompt.unified_prompt, norm_prompt.images_sequence};
 }
 
-NormalizedPrompt InputsEmbedder::normalize_prompt(const std::string& prompt,
+NormalizedPrompt InputsEmbedderImpl::normalize_prompt(const std::string& prompt,
     size_t base_image_id,
     size_t base_video_id,
     const std::vector<EncodedImage>& images,
@@ -491,7 +491,7 @@ void verify_ids(const std::vector<size_t>& image_ids, size_t base_id, size_t n_i
     }
 }
 
-std::pair<std::string, std::vector<size_t>> InputsEmbedder::IInputsEmbedder::normalize(
+std::pair<std::string, std::vector<size_t>> InputsEmbedderImpl::IInputsEmbedder::normalize(
     const std::string& prompt,
     const std::string& native_tag,
     const std::string& automatic_tag,

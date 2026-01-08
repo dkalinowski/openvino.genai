@@ -8,7 +8,7 @@
 #include "visual_language/vlm_config.hpp"
 
 #include "visual_language/vision_encoder_impl.hpp"
-#include "visual_language/inputs_embedder.hpp"
+#include "visual_language/inputs_embedder_impl.hpp"
 
 namespace ov::genai {
 
@@ -30,7 +30,7 @@ public:
     void reshape(std::shared_ptr<ov::Model> model) override;
 };
 
-class InputsEmbedderInternVLChat : public InputsEmbedder::IInputsEmbedder {
+class InputsEmbedderInternVLChat : public InputsEmbedderImpl::IInputsEmbedder {
 public:
     InputsEmbedderInternVLChat(
         const VLMConfig& vlm_config,

@@ -8,7 +8,7 @@
 #include "visual_language/vlm_config.hpp"
 
 #include "visual_language/vision_encoder_impl.hpp"
-#include "visual_language/inputs_embedder.hpp"
+#include "visual_language/inputs_embedder_impl.hpp"
 
 namespace ov::genai {
 
@@ -37,7 +37,7 @@ private:
     bool use_ov_image_preprocess = true; // default use ov image preprocess, control by env IMAGE_PREPROCESS=CPP to use cpp image preprocess
 };
 
-class InputsEmbedderQwen2VL : public InputsEmbedder::IInputsEmbedder {
+class InputsEmbedderQwen2VL : public InputsEmbedderImpl::IInputsEmbedder {
 public:
     InputsEmbedderQwen2VL(
         const VLMConfig& vlm_config,

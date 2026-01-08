@@ -28,22 +28,24 @@ struct NormalizedPrompt {
     std::vector<size_t> videos_sequence;
 };
 
-class InputsEmbedder {
+/// @brief Internal implementation class for computing input embeddings for VLMs.
+/// This class is used internally by the VLM pipeline implementation.
+class InputsEmbedderImpl {
 public:
-    InputsEmbedder(const std::filesystem::path& model_dir,
-                   const std::string& device,
-                   const ov::AnyMap device_config);
+    InputsEmbedderImpl(const std::filesystem::path& model_dir,
+                       const std::string& device,
+                       const ov::AnyMap device_config);
 
-    InputsEmbedder(const std::filesystem::path& model_dir,
-                   const DeviceMapping& device_mapping,
-                   const ov::AnyMap text_device_config,
-                   const ov::AnyMap vision_device_config);
+    InputsEmbedderImpl(const std::filesystem::path& model_dir,
+                       const DeviceMapping& device_mapping,
+                       const ov::AnyMap text_device_config,
+                       const ov::AnyMap vision_device_config);
 
-    InputsEmbedder(const ModelsMap& models_map,
-                   const Tokenizer& tokenizer,
-                   const std::filesystem::path& config_dir_path,
-                   const std::string& device,
-                   const ov::AnyMap device_config);
+    InputsEmbedderImpl(const ModelsMap& models_map,
+                       const Tokenizer& tokenizer,
+                       const std::filesystem::path& config_dir_path,
+                       const std::string& device,
+                       const ov::AnyMap device_config);
 
     // compute input embedding for prompt and multiple images
     ov::Tensor get_inputs_embeds(const std::string& prompt, const std::vector<ov::genai::EncodedImage>& images, ov::genai::VLMPerfMetrics& metrics, bool recalculate_merged_embeddings = true, const std::vector<size_t>& image_sequence = {});

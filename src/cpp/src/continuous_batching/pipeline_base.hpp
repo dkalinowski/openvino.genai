@@ -4,7 +4,7 @@
 #pragma once
 
 #include "openvino/genai/continuous_batching_pipeline.hpp"
-#include "visual_language/inputs_embedder.hpp"
+#include "visual_language/inputs_embedder_impl.hpp"
 
 #include "continuous_batching/cache_manager.hpp"
 #include "sampling/sampler.hpp"
@@ -64,7 +64,7 @@ protected:
     friend class ContinuousBatchingPipeline;
 
     ModelInputType m_model_input_type = ModelInputType::TOKENS;
-    std::shared_ptr<InputsEmbedder> m_inputs_embedder;
+    std::shared_ptr<InputsEmbedderImpl> m_inputs_embedder;
     std::mutex m_embeddings_mutex;
 
     void stream_tokens(const std::shared_ptr<ThreadedStreamerWrapper>& streamer_ptr, const GenerationHandle& handle);
