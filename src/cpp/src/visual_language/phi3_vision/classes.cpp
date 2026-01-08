@@ -715,7 +715,7 @@ EncodedImage VisionEncoderPhi3V::encode(const ov::Tensor& image, const ov::AnyMa
 VisionEncoderPhi3V::VisionEncoderPhi3V(
     const std::filesystem::path& model_dir,
     const std::string& device,
-    const ov::AnyMap properties) : VisionEncoder(model_dir, device, properties) {
+    const ov::AnyMap properties) : VisionEncoderImpl(model_dir, device, properties) {
     auto compiled_model = create_hd_feature_transformer();
     m_ireq_queue_hd_feature_transformer = std::make_unique<CircularBufferQueue<ov::InferRequest>>(
         compiled_model.get_property(ov::optimal_number_of_infer_requests),
@@ -736,7 +736,7 @@ VisionEncoderPhi3V::VisionEncoderPhi3V(
     const ModelsMap& models_map,
     const std::filesystem::path& config_dir_path,
     const std::string& device,
-    const ov::AnyMap properties) : VisionEncoder(models_map, config_dir_path, device, properties) {
+    const ov::AnyMap properties) : VisionEncoderImpl(models_map, config_dir_path, device, properties) {
     auto compiled_model = create_hd_feature_transformer();
     m_ireq_queue_hd_feature_transformer = std::make_unique<CircularBufferQueue<ov::InferRequest>>(
         compiled_model.get_property(ov::optimal_number_of_infer_requests),

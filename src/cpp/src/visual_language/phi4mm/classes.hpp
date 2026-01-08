@@ -6,7 +6,7 @@
 #include <filesystem>
 
 #include "visual_language/vlm_config.hpp"
-#include "visual_language/vision_encoder.hpp"
+#include "visual_language/vision_encoder_impl.hpp"
 #include "visual_language/inputs_embedder.hpp"
 
 namespace ov::genai {
@@ -20,7 +20,7 @@ namespace ov::genai {
  * with model directories or preloaded models and provides an interface
  * for encoding images.
  */
-class VisionEncoderPhi4MM : public VisionEncoder {
+class VisionEncoderPhi4MM : public VisionEncoderImpl {
     std::unique_ptr<CircularBufferQueue<ov::InferRequest>> m_image_preprocessors;
     std::unique_ptr<CircularBufferQueue<ov::InferRequest>> m_separator_inserters;
     std::unique_ptr<CircularBufferQueue<ov::InferRequest>> m_ireq_queue_vision_projection;

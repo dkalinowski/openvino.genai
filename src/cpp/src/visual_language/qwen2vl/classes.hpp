@@ -7,12 +7,12 @@
 
 #include "visual_language/vlm_config.hpp"
 
-#include "visual_language/vision_encoder.hpp"
+#include "visual_language/vision_encoder_impl.hpp"
 #include "visual_language/inputs_embedder.hpp"
 
 namespace ov::genai {
 
-class VisionEncoderQwen2VL : public VisionEncoder {
+class VisionEncoderQwen2VL : public VisionEncoderImpl {
 public:
     explicit VisionEncoderQwen2VL(const std::filesystem::path& model_dir, const std::string& device, const ov::AnyMap properties);
     explicit VisionEncoderQwen2VL(const ModelsMap& models_map, const std::filesystem::path& config_dir_path, const std::string& device, const ov::AnyMap properties);

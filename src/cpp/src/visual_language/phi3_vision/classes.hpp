@@ -7,7 +7,7 @@
 
 #include "visual_language/vlm_config.hpp"
 
-#include "visual_language/vision_encoder.hpp"
+#include "visual_language/vision_encoder_impl.hpp"
 #include "visual_language/inputs_embedder.hpp"
 
 namespace ov::genai {
@@ -23,7 +23,7 @@ std::vector<std::variant<ov::Tensor, size_t>> drop_image_placeholders(const ov::
 
 }
 
-class VisionEncoderPhi3V : public VisionEncoder {
+class VisionEncoderPhi3V : public VisionEncoderImpl {
     std::unique_ptr<CircularBufferQueue<ov::InferRequest>> m_ireq_queue_hd_feature_transformer;
     std::unique_ptr<CircularBufferQueue<ov::InferRequest>> m_ireq_queue_vision_projection;
     VLMConfig m_vlm_config;

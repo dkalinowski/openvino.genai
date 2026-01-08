@@ -633,7 +633,7 @@ VisionEncoderPhi4MM::VisionEncoderPhi4MM(
     const std::string& device,
     const ov::AnyMap properties
 ) :
-VisionEncoder(model_dir, device, properties),
+VisionEncoderImpl(model_dir, device, properties),
 m_image_preprocessors{create_image_preprocessors()},
 m_separator_inserters{create_separator_inserters()} {
     auto compiled_model = utils::singleton_core().compile_model(model_dir / "openvino_vision_projection_model.xml", device, {});
@@ -651,7 +651,7 @@ VisionEncoderPhi4MM::VisionEncoderPhi4MM(
     const std::string& device,
     const ov::AnyMap properties
 ) :
-VisionEncoder(models_map, config_dir_path, device, properties),
+VisionEncoderImpl(models_map, config_dir_path, device, properties),
 m_image_preprocessors{create_image_preprocessors()},
 m_separator_inserters{create_separator_inserters()} {
     const auto& vision_projection_model = utils::get_model_weights_pair(models_map, "vision_projection").first;

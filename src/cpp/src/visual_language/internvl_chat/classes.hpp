@@ -7,12 +7,12 @@
 
 #include "visual_language/vlm_config.hpp"
 
-#include "visual_language/vision_encoder.hpp"
+#include "visual_language/vision_encoder_impl.hpp"
 #include "visual_language/inputs_embedder.hpp"
 
 namespace ov::genai {
 
-class VisionEncoderInternVLChat : public VisionEncoder {
+class VisionEncoderInternVLChat : public VisionEncoderImpl {
 public:
     VisionEncoderInternVLChat(
         const std::filesystem::path& model_dir,

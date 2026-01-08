@@ -7,14 +7,14 @@
 
 #include "visual_language/vlm_config.hpp"
 
-#include "visual_language/vision_encoder.hpp"
+#include "visual_language/vision_encoder_impl.hpp"
 #include "visual_language/inputs_embedder.hpp"
 
 namespace ov::genai {
 
-class VisionEncoderNanoLLaVA : public VisionEncoder {
+class VisionEncoderNanoLLaVA : public VisionEncoderImpl {
 public:
-    using VisionEncoder::VisionEncoder;
+    using VisionEncoderImpl::VisionEncoderImpl;
 
     EncodedImage encode(const ov::Tensor& image, const ov::AnyMap& config_map) override;
 };

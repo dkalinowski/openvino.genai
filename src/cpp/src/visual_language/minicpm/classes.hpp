@@ -7,12 +7,12 @@
 
 #include "visual_language/vlm_config.hpp"
 
-#include "visual_language/vision_encoder.hpp"
+#include "visual_language/vision_encoder_impl.hpp"
 #include "visual_language/inputs_embedder.hpp"
 
 namespace ov::genai {
 
-class VisionEncoderMiniCPM : public VisionEncoder {
+class VisionEncoderMiniCPM : public VisionEncoderImpl {
     // A resampler model to resample image embeddings.
     // [N, H*W, old_hidden_size] is the input shape.
     // [N, query_num, hidden_size] is the output shape.

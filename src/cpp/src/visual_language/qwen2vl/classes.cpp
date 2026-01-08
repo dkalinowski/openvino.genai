@@ -657,7 +657,7 @@ bool check_image_preprocess_env() {
 VisionEncoderQwen2VL::VisionEncoderQwen2VL(const std::filesystem::path& model_dir,
                                            const std::string& device,
                                            const ov::AnyMap properties)
-    : VisionEncoder(model_dir, device, properties),
+    : VisionEncoderImpl(model_dir, device, properties),
       use_ov_image_preprocess(check_image_preprocess_env()) {
     if (use_ov_image_preprocess) {
         auto model_org = utils::singleton_core().read_model(model_dir / "openvino_vision_embeddings_model.xml");
@@ -669,7 +669,7 @@ VisionEncoderQwen2VL::VisionEncoderQwen2VL(const ModelsMap& models_map,
                                            const std::filesystem::path& config_dir_path,
                                            const std::string& device,
                                            const ov::AnyMap properties)
-    : VisionEncoder(models_map, config_dir_path, device, properties),
+    : VisionEncoderImpl(models_map, config_dir_path, device, properties),
       use_ov_image_preprocess(check_image_preprocess_env()) {
     if (use_ov_image_preprocess) {
         const auto& [vision_encoder_model, vision_encoder_weights] =

@@ -16,7 +16,7 @@
 #include "openvino/runtime/infer_request.hpp"
 #include "visual_language/vlm_config.hpp"
 #include "visual_language/embedding_model.hpp"
-#include "visual_language/vision_encoder.hpp"
+#include "visual_language/vision_encoder_impl.hpp"
 
 namespace ov::genai {
 struct VLMPerfMetrics;
@@ -125,7 +125,7 @@ private:
         // VLM config
         VLMConfig m_vlm_config;
         // An encoder to infer embeddings of an image.
-        VisionEncoder::Ptr m_vision_encoder;
+        VisionEncoderImpl::Ptr m_vision_encoder;
         // A model to compute token embeddings.
         // Input shape: [N, conversation length].
         // Output shape: [1, conversation length, hidden_size].

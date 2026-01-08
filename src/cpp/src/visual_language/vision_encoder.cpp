@@ -1,7 +1,7 @@
 // Copyright (C) 2023-2025 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 
-#include "vision_encoder.hpp"
+#include "vision_encoder_impl.hpp"
 #include "utils.hpp"
 
 
@@ -19,7 +19,7 @@
 
 namespace ov::genai {
     
-VisionEncoder::VisionEncoder(const std::filesystem::path& model_dir, const std::string& device, const ov::AnyMap properties) {
+VisionEncoderImpl::VisionEncoderImpl(const std::filesystem::path& model_dir, const std::string& device, const ov::AnyMap properties) {
     auto compiled_model = utils::singleton_core().compile_model(model_dir / "openvino_vision_embeddings_model.xml", device, properties);
     m_ireq_queue_vision_encoder = std::make_unique<CircularBufferQueue<ov::InferRequest>>(
         compiled_model.get_property(ov::optimal_number_of_infer_requests),
@@ -29,7 +29,7 @@ VisionEncoder::VisionEncoder(const std::filesystem::path& model_dir, const std::
     m_processor_config = utils::from_config_json_if_exists<ProcessorConfig>(model_dir, "preprocessor_config.json");
 }
 
-VisionEncoder::VisionEncoder(
+VisionEncoderImpl::VisionEncoderImpl(
     const ModelsMap& models_map,
     const std::filesystem::path& config_dir_path,
     const std::string& device,
@@ -46,11 +46,11 @@ VisionEncoder::VisionEncoder(
     m_processor_config = utils::from_config_json_if_exists<ProcessorConfig>(config_dir_path, "preprocessor_config.json");
 }
 
-ProcessorConfig VisionEncoder::get_processor_config() const {
+ProcessorConfig VisionEncoderImpl::get_processor_config() const {
     return m_processor_config;
 }
 
-VisionEncoder::Ptr VisionEncoder::create(const std::filesystem::path& model_dir, const VLMModelType model_type, const std::string& device, const ov::AnyMap properties) {
+VisionEncoderImpl::Ptr VisionEncoderImpl::create(const std::filesystem::path& model_dir, const VLMModelType model_type, const std::string& device, const ov::AnyMap properties) {
     if (model_type == VLMModelType::MINICPM) {
         return std::make_shared<VisionEncoderMiniCPM>(model_dir, device, properties);
     } else if (model_type == VLMModelType::LLAVA) {
@@ -74,11 +74,11 @@ VisionEncoder::Ptr VisionEncoder::create(const std::filesystem::path& model_dir,
     } else if (model_type == VLMModelType::GEMMA3) {
         return std::make_shared<VisionEncoderGemma3>(model_dir, device, properties);
     } else {
-        OPENVINO_THROW("Unsupported model type in VLM VisionEncoder class. Please, create feature request on new model support");
+        OPENVINO_THROW("Unsupported model type in VLM VisionEncoderImpl class. Please, create feature request on new model support");
     }
 }
 
-VisionEncoder::Ptr VisionEncoder::create(
+VisionEncoderImpl::Ptr VisionEncoderImpl::create(
     const ModelsMap& models_map,
     const std::filesystem::path& config_dir_path,
     const VLMModelType model_type,
@@ -107,7 +107,7 @@ VisionEncoder::Ptr VisionEncoder::create(
     } else if (model_type == VLMModelType::GEMMA3) {
         return std::make_shared<VisionEncoderGemma3>(models_map, config_dir_path, device, device_config);
     } else {
-        OPENVINO_THROW("Unsupported model type in VLM VisionEncoder class. Please, create feature request on new model support");
+        OPENVINO_THROW("Unsupported model type in VLM VisionEncoderImpl class. Please, create feature request on new model support");
     }
 }
 
