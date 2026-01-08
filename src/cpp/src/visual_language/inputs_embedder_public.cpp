@@ -34,7 +34,30 @@ public:
         m_vlm_config = utils::from_config_json_if_exists<VLMConfig>(config_dir_path, "config.json");
     }
 
+    InputsEmbedderImpl(
+        const Tokenizer& tokenizer,
+        VisionEncoder vision_encoder,
+        EmbeddingsModel embeddings_model,
+        const std::filesystem::path& config_dir_path)
+        : m_tokenizer_ptr(std::make_shared<Tokenizer>(tokenizer)),
+          m_vision_encoder_ptr(std::make_shared<VisionEncoder>(std::move(vision_encoder))),
+          m_embeddings_model_ptr(std::make_shared<EmbeddingsModel>(std::move(embeddings_model))),
+          m_config_dir_path(config_dir_path),
+          m_use_external_components(true)
+    {
+        // Read the VLM config to get model type information
+        m_vlm_config = utils::from_config_json_if_exists<VLMConfig>(config_dir_path, "config.json");
+    }
+
     std::vector<EncodedImage> encode_images(const std::vector<ov::Tensor>& images) {
+        if (m_use_external_components && m_vision_encoder_ptr) {
+            std::vector<EncodedImage> encoded;
+            encoded.reserve(images.size());
+            for (const auto& image : images) {
+                encoded.push_back(m_vision_encoder_ptr->encode(image));
+            }
+            return encoded;
+        }
         return m_internal_impl->encode_images(images);
     }
 
@@ -63,6 +86,8 @@ private:
     
     // For external components mode
     std::shared_ptr<Tokenizer> m_tokenizer_ptr;
+    std::shared_ptr<VisionEncoder> m_vision_encoder_ptr;
+    std::shared_ptr<EmbeddingsModel> m_embeddings_model_ptr;
     std::filesystem::path m_config_dir_path;
     VLMConfig m_vlm_config;
     bool m_use_external_components = false;
@@ -78,6 +103,13 @@ InputsEmbedder::InputsEmbedder(
     const Tokenizer& tokenizer,
     const std::filesystem::path& config_dir_path)
     : m_pimpl(std::make_unique<InputsEmbedderImpl>(tokenizer, config_dir_path)) {}
+
+InputsEmbedder::InputsEmbedder(
+    const Tokenizer& tokenizer,
+    VisionEncoder vision_encoder,
+    EmbeddingsModel embeddings_model,
+    const std::filesystem::path& config_dir_path)
+    : m_pimpl(std::make_unique<InputsEmbedderImpl>(tokenizer, std::move(vision_encoder), std::move(embeddings_model), config_dir_path)) {}
 
 InputsEmbedder::~InputsEmbedder() = default;
 

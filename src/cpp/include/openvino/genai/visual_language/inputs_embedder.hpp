@@ -12,6 +12,7 @@
 #include "openvino/genai/common_types.hpp"
 #include "openvino/genai/tokenizer.hpp"
 #include "openvino/genai/visual_language/vision_encoder.hpp"
+#include "openvino/genai/visual_language/embeddings_model.hpp"
 #include "openvino/runtime/tensor.hpp"
 
 namespace ov::genai {
@@ -39,6 +40,18 @@ public:
     /// and model files for VLM configuration.
     InputsEmbedder(
         const Tokenizer& tokenizer,
+        const std::filesystem::path& config_dir_path);
+
+    /// @brief Constructs the InputsEmbedder from pre-loaded components.
+    /// @param tokenizer A pre-loaded tokenizer.
+    /// @param vision_encoder A pre-loaded VisionEncoder.
+    /// @param embeddings_model A pre-loaded EmbeddingsModel.
+    /// @param config_dir_path A path to the directory containing config.json
+    /// for VLM configuration.
+    InputsEmbedder(
+        const Tokenizer& tokenizer,
+        VisionEncoder vision_encoder,
+        EmbeddingsModel embeddings_model,
         const std::filesystem::path& config_dir_path);
 
     /// @brief Constructs the InputsEmbedder with variadic properties.

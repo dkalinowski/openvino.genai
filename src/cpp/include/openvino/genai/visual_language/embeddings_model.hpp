@@ -51,6 +51,12 @@ public:
     /// @brief Default destructor.
     ~EmbeddingsModel();
 
+    /// @brief Move constructor.
+    EmbeddingsModel(EmbeddingsModel&& other) noexcept;
+
+    /// @brief Move assignment operator.
+    EmbeddingsModel& operator=(EmbeddingsModel&& other) noexcept;
+
     /// @brief Compute embeddings for the given input token IDs.
     /// @param input_ids Input token IDs tensor with shape [batch_size, sequence_length].
     /// @return Embeddings tensor with shape [batch_size, sequence_length, hidden_size].

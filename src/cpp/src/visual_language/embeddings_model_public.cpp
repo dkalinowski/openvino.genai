@@ -56,6 +56,10 @@ EmbeddingsModel::EmbeddingsModel(
 
 EmbeddingsModel::~EmbeddingsModel() = default;
 
+EmbeddingsModel::EmbeddingsModel(EmbeddingsModel&& other) noexcept = default;
+
+EmbeddingsModel& EmbeddingsModel::operator=(EmbeddingsModel&& other) noexcept = default;
+
 ov::Tensor EmbeddingsModel::infer(const ov::Tensor& input_ids) {
     return m_pimpl->infer(input_ids);
 }

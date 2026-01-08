@@ -55,6 +55,10 @@ VisionEncoder::VisionEncoder(
 
 VisionEncoder::~VisionEncoder() = default;
 
+VisionEncoder::VisionEncoder(VisionEncoder&& other) noexcept = default;
+
+VisionEncoder& VisionEncoder::operator=(VisionEncoder&& other) noexcept = default;
+
 EncodedImage VisionEncoder::encode(const ov::Tensor& image, const ov::AnyMap& config_map) {
     return m_pimpl->encode(image, config_map);
 }
