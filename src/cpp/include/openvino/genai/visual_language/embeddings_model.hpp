@@ -17,6 +17,9 @@ namespace ov::genai {
 /// This is the public API class that uses PIMPL pattern to hide implementation details.
 class OPENVINO_GENAI_EXPORTS EmbeddingsModel {
 public:
+    /// @brief Shared pointer type for EmbeddingsModel.
+    using Ptr = std::shared_ptr<EmbeddingsModel>;
+
     /// @brief Constructs the embeddings model from model_dir.
     /// @param model_dir A folder containing openvino_text_embeddings_model.xml.
     /// @param device A device to compile the model for.

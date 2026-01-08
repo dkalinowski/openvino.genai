@@ -50,8 +50,8 @@ public:
     /// for VLM configuration.
     InputsEmbedder(
         const Tokenizer& tokenizer,
-        VisionEncoder vision_encoder,
-        EmbeddingsModel embeddings_model,
+        VisionEncoder::Ptr vision_encoder,
+        EmbeddingsModel::Ptr embeddings_model,
         const std::filesystem::path& config_dir_path);
 
     /// @brief Constructs the InputsEmbedder with variadic properties.

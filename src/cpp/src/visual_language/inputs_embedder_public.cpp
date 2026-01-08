@@ -36,12 +36,12 @@ public:
 
     InputsEmbedderImpl(
         const Tokenizer& tokenizer,
-        VisionEncoder vision_encoder,
-        EmbeddingsModel embeddings_model,
+        VisionEncoder::Ptr vision_encoder,
+        EmbeddingsModel::Ptr embeddings_model,
         const std::filesystem::path& config_dir_path)
         : m_tokenizer_ptr(std::make_shared<Tokenizer>(tokenizer)),
-          m_vision_encoder_ptr(std::make_shared<VisionEncoder>(std::move(vision_encoder))),
-          m_embeddings_model_ptr(std::make_shared<EmbeddingsModel>(std::move(embeddings_model))),
+          m_vision_encoder_ptr(vision_encoder),
+          m_embeddings_model_ptr(embeddings_model),
           m_config_dir_path(config_dir_path),
           m_use_external_components(true)
     {
@@ -106,10 +106,10 @@ InputsEmbedder::InputsEmbedder(
 
 InputsEmbedder::InputsEmbedder(
     const Tokenizer& tokenizer,
-    VisionEncoder vision_encoder,
-    EmbeddingsModel embeddings_model,
+    VisionEncoder::Ptr vision_encoder,
+    EmbeddingsModel::Ptr embeddings_model,
     const std::filesystem::path& config_dir_path)
-    : m_pimpl(std::make_unique<InputsEmbedderImpl>(tokenizer, std::move(vision_encoder), std::move(embeddings_model), config_dir_path)) {}
+    : m_pimpl(std::make_unique<InputsEmbedderImpl>(tokenizer, vision_encoder, embeddings_model, config_dir_path)) {}
 
 InputsEmbedder::~InputsEmbedder() = default;
 

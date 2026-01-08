@@ -69,6 +69,9 @@ struct OPENVINO_GENAI_EXPORTS EncodedImage {
 /// pattern to hide implementation details.
 class OPENVINO_GENAI_EXPORTS VisionEncoder {
 public:
+    /// @brief Shared pointer type for VisionEncoder.
+    using Ptr = std::shared_ptr<VisionEncoder>;
+
     /// @brief Constructs the encoder from model_dir.
     /// @param model_dir A folder containing openvino_vision_embeddings_model.xml and
     /// preprocessor_config.json.

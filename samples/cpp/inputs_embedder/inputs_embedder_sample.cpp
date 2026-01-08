@@ -5,6 +5,9 @@
 #include <string>
 #include <vector>
 
+#include "openvino/genai/tokenizer.hpp"
+#include "openvino/genai/visual_language/vision_encoder.hpp"
+#include "openvino/genai/visual_language/embeddings_model.hpp"
 #include "openvino/genai/visual_language/inputs_embedder.hpp"
 #include "openvino/openvino.hpp"
 
@@ -32,6 +35,108 @@ ov::Tensor load_image(const std::string& image_path) {
     return image;
 }
 
+void print_tensor_shape(const ov::Tensor& tensor, const std::string& name) {
+    std::cout << name << " shape: [";
+    for (size_t i = 0; i < tensor.get_shape().size(); ++i) {
+        std::cout << tensor.get_shape()[i];
+        if (i < tensor.get_shape().size() - 1) std::cout << ", ";
+    }
+    std::cout << "]" << std::endl;
+}
+
+// Demonstrates creating InputsEmbedder from model directory (simple approach)
+void demo_from_model_dir(const std::string& model_dir, const std::string& device) {
+    std::cout << "\n=== Demo 1: Create InputsEmbedder from model directory ===" << std::endl;
+    
+    // Create the InputsEmbedder directly from model directory
+    // This is the simplest approach - all components are loaded internally
+    ov::genai::InputsEmbedder inputs_embedder(model_dir, device);
+
+    // Get the tokenizer for text processing
+    auto tokenizer = inputs_embedder.get_tokenizer();
+    std::cout << "InputsEmbedder created with internal tokenizer." << std::endl;
+
+    // Load and encode a sample image
+    std::vector<ov::Tensor> images;
+    images.push_back(load_image("sample_image.png"));
+    
+    std::cout << "\nEncoding images..." << std::endl;
+    auto encoded_images = inputs_embedder.encode_images(images);
+    std::cout << "Encoded " << encoded_images.size() << " image(s)." << std::endl;
+
+    // Create a prompt and get embeddings
+    std::string prompt = "<image>\nDescribe this image in detail.";
+    std::cout << "Prompt: " << prompt << std::endl;
+
+    std::cout << "\nComputing input embeddings..." << std::endl;
+    ov::Tensor inputs_embeds = inputs_embedder.get_inputs_embeds(prompt, encoded_images);
+    print_tensor_shape(inputs_embeds, "Output embeddings");
+}
+
+// Demonstrates creating InputsEmbedder from pre-loaded components (advanced approach)
+void demo_from_components(const std::string& model_dir, const std::string& device) {
+    std::cout << "\n=== Demo 2: Create InputsEmbedder from pre-loaded components ===" << std::endl;
+    
+    // Step 1: Create the individual components separately
+    // This allows for more control over initialization and potential reuse
+    
+    std::cout << "\nStep 1: Loading individual components..." << std::endl;
+    
+    // Create the tokenizer
+    ov::genai::Tokenizer tokenizer(model_dir);
+    std::cout << "  - Tokenizer loaded" << std::endl;
+    
+    // Create the VisionEncoder as a shared pointer
+    // The VisionEncoder handles image preprocessing and encoding
+    auto vision_encoder = std::make_shared<ov::genai::VisionEncoder>(model_dir, device);
+    std::cout << "  - VisionEncoder loaded" << std::endl;
+    
+    // Create the EmbeddingsModel as a shared pointer
+    // The EmbeddingsModel converts token IDs to embeddings
+    auto embeddings_model = std::make_shared<ov::genai::EmbeddingsModel>(model_dir, device);
+    std::cout << "  - EmbeddingsModel loaded" << std::endl;
+    
+    // Step 2: Create InputsEmbedder from the pre-loaded components
+    // This constructor takes ownership via shared_ptr, allowing the components
+    // to be shared with other parts of your application if needed
+    std::cout << "\nStep 2: Creating InputsEmbedder from components..." << std::endl;
+    ov::genai::InputsEmbedder inputs_embedder(
+        tokenizer,
+        vision_encoder,      // VisionEncoder::Ptr
+        embeddings_model,    // EmbeddingsModel::Ptr
+        model_dir            // Config directory path
+    );
+    std::cout << "InputsEmbedder created from pre-loaded components." << std::endl;
+
+    // Step 3: Use the InputsEmbedder as usual
+    std::cout << "\nStep 3: Using InputsEmbedder..." << std::endl;
+    
+    // Load and encode a sample image
+    std::vector<ov::Tensor> images;
+    images.push_back(load_image("sample_image.png"));
+    
+    std::cout << "\nEncoding images using the shared VisionEncoder..." << std::endl;
+    auto encoded_images = inputs_embedder.encode_images(images);
+    std::cout << "Encoded " << encoded_images.size() << " image(s)." << std::endl;
+
+    // You can also use the VisionEncoder directly if needed
+    std::cout << "\nAlternatively, encode directly with VisionEncoder::Ptr..." << std::endl;
+    auto directly_encoded = vision_encoder->encode(images[0]);
+    print_tensor_shape(directly_encoded.resized_source, "Directly encoded image");
+
+    // Create a prompt and get embeddings
+    std::string prompt = "<image>\nWhat do you see in this image?";
+    std::cout << "\nPrompt: " << prompt << std::endl;
+
+    std::cout << "\nComputing input embeddings..." << std::endl;
+    ov::Tensor inputs_embeds = inputs_embedder.get_inputs_embeds(prompt, encoded_images);
+    print_tensor_shape(inputs_embeds, "Output embeddings");
+    
+    // Demonstrate that the shared components can still be used independently
+    std::cout << "\nNote: The VisionEncoder and EmbeddingsModel can be reused" << std::endl;
+    std::cout << "      in other parts of your application since they're shared_ptr." << std::endl;
+}
+
 int main(int argc, char* argv[]) {
     if (argc < 2) {
         std::cerr << "Usage: " << argv[0] << " <model_dir> [device]" << std::endl;
@@ -48,77 +153,17 @@ int main(int argc, char* argv[]) {
     std::string model_dir = argv[1];
     std::string device = argc > 2 ? argv[2] : "CPU";
 
-    std::cout << "Loading InputsEmbedder from: " << model_dir << std::endl;
+    std::cout << "Model directory: " << model_dir << std::endl;
     std::cout << "Device: " << device << std::endl;
 
     try {
-        // Create the InputsEmbedder from model directory
-        // This loads the text embeddings model and vision encoder
-        ov::genai::InputsEmbedder inputs_embedder(model_dir, device);
-
-        // Get the tokenizer for text processing
-        auto tokenizer = inputs_embedder.get_tokenizer();
-        std::cout << "Tokenizer loaded successfully." << std::endl;
-
-        // Load a sample image
-        std::vector<ov::Tensor> images;
-        images.push_back(load_image("sample_image.png"));
-        std::cout << "Image tensor created with shape: [";
-        for (size_t i = 0; i < images[0].get_shape().size(); ++i) {
-            std::cout << images[0].get_shape()[i];
-            if (i < images[0].get_shape().size() - 1) std::cout << ", ";
-        }
-        std::cout << "]" << std::endl;
-
-        // Encode images using the vision encoder
-        std::cout << "\nEncoding images..." << std::endl;
-        auto encoded_images = inputs_embedder.encode_images(images);
-        std::cout << "Encoded " << encoded_images.size() << " image(s)." << std::endl;
+        // Demo 1: Simple approach - create from model directory
+        demo_from_model_dir(model_dir, device);
         
-        if (!encoded_images.empty()) {
-            const auto& encoded = encoded_images[0];
-            std::cout << "First encoded image shape: [";
-            for (size_t i = 0; i < encoded.resized_source.get_shape().size(); ++i) {
-                std::cout << encoded.resized_source.get_shape()[i];
-                if (i < encoded.resized_source.get_shape().size() - 1) std::cout << ", ";
-            }
-            std::cout << "]" << std::endl;
-        }
+        // Demo 2: Advanced approach - create from pre-loaded components
+        demo_from_components(model_dir, device);
 
-        // Create a prompt with image placeholder
-        std::string prompt = "<image>\nDescribe this image in detail.";
-        std::cout << "\nPrompt: " << prompt << std::endl;
-
-        // Get combined input embeddings for the prompt and images
-        std::cout << "\nComputing input embeddings..." << std::endl;
-        ov::Tensor inputs_embeds = inputs_embedder.get_inputs_embeds(prompt, encoded_images);
-
-        // Display output shape
-        const auto& output_shape = inputs_embeds.get_shape();
-        std::cout << "Output embeddings shape: [";
-        for (size_t i = 0; i < output_shape.size(); ++i) {
-            std::cout << output_shape[i];
-            if (i < output_shape.size() - 1) std::cout << ", ";
-        }
-        std::cout << "]" << std::endl;
-
-        // Display first few embedding values
-        std::cout << "\nFirst token embedding (first 5 values): [";
-        const auto* embedding_data = inputs_embeds.data<float>();
-        const size_t hidden_size = output_shape.back();
-        const size_t display_count = std::min(static_cast<size_t>(5), hidden_size);
-        
-        for (size_t i = 0; i < display_count; ++i) {
-            std::cout << embedding_data[i];
-            if (i < display_count - 1) std::cout << ", ";
-        }
-        if (hidden_size > display_count) {
-            std::cout << ", ...";
-        }
-        std::cout << "]" << std::endl;
-
-        std::cout << "\nInputs embeddings computed successfully!" << std::endl;
-        std::cout << "These embeddings can now be fed to a language model for generation." << std::endl;
+        std::cout << "\n=== All demos completed successfully! ===" << std::endl;
 
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
