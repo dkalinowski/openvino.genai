@@ -82,7 +82,7 @@ ov::genai::utils::GenerationFinishInfo get_lm_encoded_results(
     std::optional<ov::Tensor> position_ids,
     std::optional<ov::Tensor> token_type_ids,
     utils::KVCacheState& kv_cache_state,
-    EmbeddingsModel::Ptr m_embedding,
+    EmbeddingsModelImpl::Ptr m_embedding,
     std::optional<int64_t> rope_delta,
     const size_t max_kv_cache_size
 ) {

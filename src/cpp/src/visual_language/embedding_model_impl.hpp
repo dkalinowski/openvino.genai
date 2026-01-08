@@ -29,28 +29,30 @@ struct EmbeddingsRequest {
     ov::Tensor remote_tensor;
 };
 
-class EmbeddingsModel {
+/// @brief Internal implementation class for computing text embeddings.
+/// This class is used internally by VLM implementations.
+class EmbeddingsModelImpl {
 public:
-    using Ptr = std::shared_ptr<EmbeddingsModel>;
+    using Ptr = std::shared_ptr<EmbeddingsModelImpl>;
 
-    EmbeddingsModel(const std::filesystem::path& model_dir,
-                    const float scale_emb,
-                    const std::string& device,
-                    const ov::AnyMap& properties);
+    EmbeddingsModelImpl(const std::filesystem::path& model_dir,
+                        const float scale_emb,
+                        const std::string& device,
+                        const ov::AnyMap& properties);
 
-    EmbeddingsModel(const std::string& model,
-                    const ov::Tensor& weights,
-                    const float scale_emb,
-                    const std::string& device,
-                    const ov::AnyMap& properties);
+    EmbeddingsModelImpl(const std::string& model,
+                        const ov::Tensor& weights,
+                        const float scale_emb,
+                        const std::string& device,
+                        const ov::AnyMap& properties);
 
-    EmbeddingsModel() = default;
+    EmbeddingsModelImpl() = default;
 
     static Ptr create(const std::filesystem::path& model_dir,
                       const float scale_emb,
                       const std::string& device,
                       const ov::AnyMap& properties) {
-        return std::make_shared<EmbeddingsModel>(model_dir, scale_emb, device, properties);
+        return std::make_shared<EmbeddingsModelImpl>(model_dir, scale_emb, device, properties);
     }
 
     static Ptr create(const std::string& model,
@@ -58,7 +60,7 @@ public:
                       const float scale_emb,
                       const std::string& device,
                       const ov::AnyMap& properties) {
-        return std::make_shared<EmbeddingsModel>(model, weights, scale_emb, device, properties);
+        return std::make_shared<EmbeddingsModelImpl>(model, weights, scale_emb, device, properties);
     }
 
     // We have getter for the request queue, so we can reserve request outside of infer scope

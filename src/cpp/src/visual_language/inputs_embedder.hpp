@@ -15,7 +15,7 @@
 #include "openvino/runtime/tensor.hpp"
 #include "openvino/runtime/infer_request.hpp"
 #include "visual_language/vlm_config.hpp"
-#include "visual_language/embedding_model.hpp"
+#include "visual_language/embedding_model_impl.hpp"
 #include "visual_language/vision_encoder_impl.hpp"
 
 namespace ov::genai {
@@ -86,7 +86,7 @@ public:
     std::pair<ov::Tensor, std::optional<int64_t>> get_generation_phase_position_ids(const size_t inputs_embeds_size, const size_t history_size, int64_t rope_delta);
 
     // returns embedding model which converts token_id(s) to embedding vectors
-    EmbeddingsModel::Ptr get_embedding_model() const;
+    EmbeddingsModelImpl::Ptr get_embedding_model() const;
 
     // returns tokenizer
     Tokenizer get_tokenizer() const;
@@ -129,7 +129,7 @@ private:
         // A model to compute token embeddings.
         // Input shape: [N, conversation length].
         // Output shape: [1, conversation length, hidden_size].
-        EmbeddingsModel::Ptr m_embedding;
+        EmbeddingsModelImpl::Ptr m_embedding;
         // A tokenizer encoding a prompt.
         Tokenizer m_tokenizer;
         // True if chat mode is activated to save conversation
@@ -194,7 +194,7 @@ private:
 
         virtual std::pair<ov::Tensor, std::optional<int64_t>> get_generation_phase_position_ids(const size_t inputs_embeds_size, const size_t history_size, int64_t rope_delta);
 
-        EmbeddingsModel::Ptr get_embedding_model() const {
+        EmbeddingsModelImpl::Ptr get_embedding_model() const {
             return m_embedding;
         }
 

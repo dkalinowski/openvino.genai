@@ -6,7 +6,7 @@
 
 #include "visual_language/clip.hpp"
 #include "visual_language/vision_encoder_impl.hpp"
-#include "visual_language/embedding_model.hpp"
+#include "visual_language/embedding_model_impl.hpp"
 
 #include "visual_language/qwen2vl/classes.hpp"
 #include "visual_language/qwen2_5_vl/classes.hpp"
@@ -70,7 +70,7 @@ InputsEmbedder::IInputsEmbedder::IInputsEmbedder(
         const ov::AnyMap device_config) :
     m_vlm_config{vlm_config},
     m_vision_encoder(VisionEncoderImpl::create(model_dir, m_vlm_config.model_type, device, device_config)),
-    m_embedding(EmbeddingsModel::create(model_dir, m_vlm_config.scale_emb, device, device_config)),
+    m_embedding(EmbeddingsModelImpl::create(model_dir, m_vlm_config.scale_emb, device, device_config)),
     m_tokenizer{model_dir, device_config} { }
 
 InputsEmbedder::IInputsEmbedder::IInputsEmbedder(
@@ -81,7 +81,7 @@ InputsEmbedder::IInputsEmbedder::IInputsEmbedder(
         const ov::AnyMap vision_device_config) :
     m_vlm_config{vlm_config},
     m_vision_encoder(VisionEncoderImpl::create(model_dir, m_vlm_config.model_type, device_mapping.at("vision_embeddings"), vision_device_config)),
-    m_embedding(EmbeddingsModel::create(model_dir, m_vlm_config.scale_emb, device_mapping.at("text_embeddings"), text_device_config)),
+    m_embedding(EmbeddingsModelImpl::create(model_dir, m_vlm_config.scale_emb, device_mapping.at("text_embeddings"), text_device_config)),
     m_tokenizer{model_dir, text_device_config} { }
 
 InputsEmbedder::IInputsEmbedder::IInputsEmbedder(
@@ -99,7 +99,7 @@ InputsEmbedder::IInputsEmbedder::IInputsEmbedder(
         device,
         device_config
     )),
-    m_embedding(EmbeddingsModel::create(
+    m_embedding(EmbeddingsModelImpl::create(
         utils::get_model_weights_pair(models_map, "text_embeddings").first,
         utils::get_model_weights_pair(models_map, "text_embeddings").second,
         m_vlm_config.scale_emb,
@@ -438,7 +438,7 @@ std::pair<ov::Tensor, std::optional<int64_t>> InputsEmbedder::get_generation_pha
     return m_impl->get_generation_phase_position_ids(inputs_embeds_size, history_size, rope_delta);
 }
 
-EmbeddingsModel::Ptr InputsEmbedder::get_embedding_model() const {
+EmbeddingsModelImpl::Ptr InputsEmbedder::get_embedding_model() const {
     return m_impl->get_embedding_model();
 }
 

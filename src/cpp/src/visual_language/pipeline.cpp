@@ -11,7 +11,7 @@
 
 #include "visual_language/vlm_config.hpp"
 #include "visual_language/inputs_embedder.hpp"
-#include "visual_language/embedding_model.hpp"
+#include "visual_language/embedding_model_impl.hpp"
 #include "visual_language/pipeline_base.hpp"
 #include "visual_language/continuous_batching_adapter.hpp"
 
@@ -51,7 +51,7 @@ class VLMPipeline::VLMPipelineImpl : public VLMPipelineBase{
     // A model to compute token embeddings.
     // Input shape: [N, conversation length].
     // Output shape: [1, conversation length, hidden_size].
-    EmbeddingsModel::Ptr m_embedding;
+    EmbeddingsModelImpl::Ptr m_embedding;
     // A language model used to generate a response.
     // Input shapes: inputs_embeds[N, conversation length, hidden_size],
     // position_ids[N, conversation length], beam_idx[N].

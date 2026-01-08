@@ -9,7 +9,7 @@
 
 #include <openvino/runtime/infer_request.hpp>
 
-#include "visual_language/embedding_model.hpp"
+#include "visual_language/embedding_model_impl.hpp"
 #include "sequence_group.hpp"
 #include "continuous_batching/scheduler.hpp"
 #include "continuous_batching/timer.hpp"
@@ -47,7 +47,7 @@ class ModelRunner {
     // A model to compute token embeddings.
     // Input shape: [N, conversation length].
     // Output shape: [1, conversation length, hidden_size].
-    EmbeddingsModel::Ptr m_embedding;
+    EmbeddingsModelImpl::Ptr m_embedding;
 
     std::shared_ptr<InputsEmbedder> m_inputs_embedder;
 

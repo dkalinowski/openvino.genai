@@ -11,7 +11,7 @@
 
 #include "utils.hpp"
 
-#include "embedding_model.hpp"
+#include "embedding_model_impl.hpp"
 
 namespace {
 
@@ -40,7 +40,7 @@ std::unique_ptr<ov::genai::CircularBufferQueue<ov::genai::EmbeddingsRequest>> in
 namespace ov {
 namespace genai {
 
-EmbeddingsModel::EmbeddingsModel(const std::filesystem::path& model_dir,
+EmbeddingsModelImpl::EmbeddingsModelImpl(const std::filesystem::path& model_dir,
                                  const float scale_emb,
                                  const std::string& device,
                                  const ov::AnyMap& properties) {
@@ -75,7 +75,7 @@ EmbeddingsModel::EmbeddingsModel(const std::filesystem::path& model_dir,
     m_embeddings_requests_queue = init(compiled_model);
 }
 
-EmbeddingsModel::EmbeddingsModel(const std::string& model,
+EmbeddingsModelImpl::EmbeddingsModelImpl(const std::string& model,
                                  const ov::Tensor& weights,
                                  const float scale_emb,
                                  const std::string& device,
@@ -89,11 +89,11 @@ EmbeddingsModel::EmbeddingsModel(const std::string& model,
     m_embeddings_requests_queue = init(compiled_model);
 }
 
-std::unique_ptr<CircularBufferQueue<EmbeddingsRequest>>& EmbeddingsModel::get_request_queue() {
+std::unique_ptr<CircularBufferQueue<EmbeddingsRequest>>& EmbeddingsModelImpl::get_request_queue() {
     return this->m_embeddings_requests_queue;
 }
 
-ov::Tensor EmbeddingsModel::infer(EmbeddingsRequest& req, const ov::Tensor& input_idx, bool return_remote_tensor) {
+ov::Tensor EmbeddingsModelImpl::infer(EmbeddingsRequest& req, const ov::Tensor& input_idx, bool return_remote_tensor) {
     OPENVINO_ASSERT(req.ireq, "Text embeddings decoder model must be compiled first. Cannot infer non-compiled model");
     // measure time
     auto start_time = std::chrono::steady_clock::now();
@@ -112,7 +112,7 @@ ov::Tensor EmbeddingsModel::infer(EmbeddingsRequest& req, const ov::Tensor& inpu
     return req.ireq.get_output_tensor();
 }
 
-void EmbeddingsModel::merge_postprocess(std::shared_ptr<ov::Model> model, float scale_emb) const {
+void EmbeddingsModelImpl::merge_postprocess(std::shared_ptr<ov::Model> model, float scale_emb) const {
     ov::preprocess::PrePostProcessor ppp(model);
 
     ppp.output().postprocess().custom([scale_emb](const ov::Output<ov::Node>& node) {
