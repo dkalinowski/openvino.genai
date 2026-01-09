@@ -107,6 +107,13 @@ InputsEmbedderQwen2_5_VL::InputsEmbedderQwen2_5_VL(
     const ov::AnyMap device_config) :
     InputsEmbedderQwen2VL(vlm_config, models_map, tokenizer, config_dir_path, device, device_config) {}
 
+InputsEmbedderQwen2_5_VL::InputsEmbedderQwen2_5_VL(
+    const VLMConfig& vlm_config,
+    const Tokenizer& tokenizer,
+    VisionEncoderImpl::Ptr vision_encoder_impl,
+    EmbeddingsModelImpl::Ptr embeddings_model_impl) :
+    InputsEmbedderQwen2VL(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl) {}
+
 std::pair<ov::Tensor, ov::Tensor> InputsEmbedderQwen2_5_VL::run_video_image_embeddings_merger(
     const std::vector<EncodedImage>& images, 
     const std::vector<size_t>& images_sequence,

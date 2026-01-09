@@ -110,6 +110,16 @@ InputsEmbedderImpl::IInputsEmbedder::IInputsEmbedder(
     )),
     m_tokenizer(tokenizer) { }
 
+InputsEmbedderImpl::IInputsEmbedder::IInputsEmbedder(
+        const VLMConfig& vlm_config,
+        const Tokenizer& tokenizer,
+        VisionEncoderImpl::Ptr vision_encoder_impl,
+        EmbeddingsModelImpl::Ptr embeddings_model_impl) :
+    m_vlm_config{vlm_config},
+    m_vision_encoder(vision_encoder_impl),
+    m_embedding(embeddings_model_impl),
+    m_tokenizer(tokenizer) { }
+
 ov::Tensor InputsEmbedderImpl::IInputsEmbedder::apply_chat_template_tokenize(const std::string& prompt, ov::genai::VLMPerfMetrics& metrics) {
     bool add_special_tokens = m_add_special_tokens_is_set ? m_add_special_tokens : !(m_is_chat_conversation || m_apply_chat_template);
     if (m_is_chat_conversation) {
@@ -361,6 +371,39 @@ InputsEmbedderImpl::InputsEmbedderImpl(const ModelsMap& models_map,
     }
 }
 
+InputsEmbedderImpl::InputsEmbedderImpl(const Tokenizer& tokenizer,
+                               VisionEncoderImpl::Ptr vision_encoder_impl,
+                               EmbeddingsModelImpl::Ptr embeddings_model_impl,
+                               const std::filesystem::path& config_dir_path) {
+    auto vlm_config = utils::from_config_json_if_exists<VLMConfig>(config_dir_path, "config.json");
+
+    if (vlm_config.model_type == VLMModelType::MINICPM) {
+        m_impl = std::make_shared<InputsEmbedderMiniCPM>(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl);
+    } else if (vlm_config.model_type == VLMModelType::LLAVA) {
+        m_impl = std::make_shared<InputsEmbedderLLaVA>(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl);
+    } else if (vlm_config.model_type == VLMModelType::NANOLLAVA) {
+        m_impl = std::make_shared<InputsEmbedderNanoLLaVA>(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl);
+    } else if (vlm_config.model_type == VLMModelType::LLAVA_NEXT) {
+        m_impl = std::make_shared<InputsEmbedderLLaVANext>(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl);
+    } else if (vlm_config.model_type == VLMModelType::LLAVA_NEXT_VIDEO) {
+        m_impl = std::make_shared<InputsEmbedderLLaVANextVideo>(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl);
+    } else if (vlm_config.model_type == VLMModelType::INTERNVL_CHAT) {
+        m_impl = std::make_shared<InputsEmbedderInternVLChat>(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl);
+    } else if (vlm_config.model_type == VLMModelType::PHI3_V) {
+        m_impl = std::make_shared<InputsEmbedderPhi3V>(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl);
+    } else if (vlm_config.model_type == VLMModelType::PHI4MM) {
+        m_impl = std::make_shared<InputsEmbedderPhi4MM>(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl);
+    } else if (vlm_config.model_type == VLMModelType::QWEN2_VL) {
+        m_impl = std::make_shared<InputsEmbedderQwen2VL>(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl);
+    } else if (vlm_config.model_type == VLMModelType::QWEN2_5_VL) {
+        m_impl = std::make_shared<InputsEmbedderQwen2_5_VL>(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl);
+    } else if (vlm_config.model_type == VLMModelType::GEMMA3) {
+        m_impl = std::make_shared<InputsEmbedderGemma3>(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl);
+    } else {
+        OPENVINO_THROW("Unsupported model type in VLM InputsEmbedder class. Please, create feature request on new model support");
+    }
+}
+
 ov::Tensor InputsEmbedderImpl::get_inputs_embeds(const std::string& prompt, const std::vector<ov::genai::EncodedImage>& images, ov::genai::VLMPerfMetrics& metrics, bool recalculate_merged_embeddings, const std::vector<size_t>& image_sequence) {
     return m_impl->get_inputs_embeds(prompt, images, metrics, recalculate_merged_embeddings, image_sequence);
 }
@@ -531,9 +574,9 @@ std::pair<std::string, std::vector<size_t>> InputsEmbedderImpl::IInputsEmbedder:
 // ======================== InputsEmbedder (public API) ========================
 
 /// @brief The implementation class that wraps the internal InputsEmbedderImpl for the public API.
-class InputsEmbedder::InputsEmbedderImpl {
+class InputsEmbedder::InputsEmbedderImplWrapper {
 public:
-    InputsEmbedderImpl(
+    InputsEmbedderImplWrapper(
         const std::filesystem::path& model_dir,
         const std::string& device,
         const ov::AnyMap& device_config)
@@ -542,7 +585,7 @@ public:
           m_device(device),
           m_device_config(device_config) {}
 
-    InputsEmbedderImpl(
+    InputsEmbedderImplWrapper(
         const Tokenizer& tokenizer,
         const std::filesystem::path& config_dir_path)
         : m_tokenizer_ptr(std::make_shared<Tokenizer>(tokenizer)),
@@ -553,7 +596,7 @@ public:
         m_vlm_config = utils::from_config_json_if_exists<VLMConfig>(config_dir_path, "config.json");
     }
 
-    InputsEmbedderImpl(
+    InputsEmbedderImplWrapper(
         const Tokenizer& tokenizer,
         VisionEncoder::Ptr vision_encoder,
         EmbeddingsModel::Ptr embeddings_model,
@@ -566,17 +609,19 @@ public:
     {
         // Read the VLM config to get model type information
         m_vlm_config = utils::from_config_json_if_exists<VLMConfig>(config_dir_path, "config.json");
+        
+        // Create internal impl using the pre-loaded components
+        // This allows the InputsEmbedder to work with VLMPipeline
+        m_internal_impl = std::make_shared<ov::genai::InputsEmbedderImpl>(
+            tokenizer,
+            vision_encoder->get_internal_impl(),
+            embeddings_model->get_internal_impl(),
+            config_dir_path
+        );
     }
 
     std::vector<EncodedImage> encode_images(const std::vector<ov::Tensor>& images) {
-        if (m_use_external_components && m_vision_encoder_ptr) {
-            std::vector<EncodedImage> encoded;
-            encoded.reserve(images.size());
-            for (const auto& image : images) {
-                encoded.push_back(m_vision_encoder_ptr->encode(image));
-            }
-            return encoded;
-        }
+        // Use internal impl for encoding to ensure consistency
         return m_internal_impl->encode_images(images);
     }
 
@@ -593,6 +638,12 @@ public:
             return *m_tokenizer_ptr;
         }
         return m_internal_impl->get_tokenizer();
+    }
+
+    /// @brief Get the internal InputsEmbedderImpl for use by friend classes.
+    /// @note This is only accessible by friend classes (e.g., VLMPipeline).
+    std::shared_ptr<ov::genai::InputsEmbedderImpl> get_internal_impl() const {
+        return m_internal_impl;
     }
 
 private:
@@ -616,19 +667,19 @@ InputsEmbedder::InputsEmbedder(
     const std::filesystem::path& model_dir,
     const std::string& device,
     const ov::AnyMap& device_config)
-    : m_pimpl(std::make_unique<InputsEmbedderImpl>(model_dir, device, device_config)) {}
+    : m_pimpl(std::make_unique<InputsEmbedderImplWrapper>(model_dir, device, device_config)) {}
 
 InputsEmbedder::InputsEmbedder(
     const Tokenizer& tokenizer,
     const std::filesystem::path& config_dir_path)
-    : m_pimpl(std::make_unique<InputsEmbedderImpl>(tokenizer, config_dir_path)) {}
+    : m_pimpl(std::make_unique<InputsEmbedderImplWrapper>(tokenizer, config_dir_path)) {}
 
 InputsEmbedder::InputsEmbedder(
     const Tokenizer& tokenizer,
     VisionEncoder::Ptr vision_encoder,
     EmbeddingsModel::Ptr embeddings_model,
     const std::filesystem::path& config_dir_path)
-    : m_pimpl(std::make_unique<InputsEmbedderImpl>(tokenizer, vision_encoder, embeddings_model, config_dir_path)) {}
+    : m_pimpl(std::make_unique<InputsEmbedderImplWrapper>(tokenizer, vision_encoder, embeddings_model, config_dir_path)) {}
 
 InputsEmbedder::~InputsEmbedder() = default;
 
@@ -645,6 +696,10 @@ ov::Tensor InputsEmbedder::get_inputs_embeds(
 
 Tokenizer InputsEmbedder::get_tokenizer() const {
     return m_pimpl->get_tokenizer();
+}
+
+std::shared_ptr<InputsEmbedderImpl> InputsEmbedder::get_internal_impl() const {
+    return m_pimpl->get_internal_impl();
 }
 
 } // namespace ov::genai

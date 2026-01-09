@@ -90,6 +90,20 @@ public:
         Properties&&... properties)
         : VLMPipeline(models_map, tokenizer, config_dir_path, device, ov::AnyMap{std::forward<Properties>(properties)...}) { }
 
+    /// @brief Construct a pipeline from a pre-loaded InputsEmbedder.
+    /// @param inputs_embedder A pre-loaded InputsEmbedder containing tokenizer, vision encoder, and embeddings model.
+    /// @param models_path A folder to read the language model IR.
+    /// @param device Inference device for the language model.
+    /// @param properties A config to pass to ov::Core::compile_model().
+    /// @param generation_config Optional generation configuration for the pipeline.
+    VLMPipeline(
+        InputsEmbedder::Ptr inputs_embedder,
+        const std::filesystem::path& models_path,
+        const std::string& device,
+        const ov::AnyMap& properties = {},
+        const ov::genai::GenerationConfig& generation_config = {}
+    );
+
     /// @brief Default destructor.
     ~VLMPipeline();
 

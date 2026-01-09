@@ -47,6 +47,16 @@ public:
                        const std::string& device,
                        const ov::AnyMap device_config);
 
+    /// @brief Constructs InputsEmbedderImpl from pre-loaded components.
+    /// @param tokenizer A pre-loaded tokenizer.
+    /// @param vision_encoder_impl A pre-loaded VisionEncoderImpl.
+    /// @param embeddings_model_impl A pre-loaded EmbeddingsModelImpl.
+    /// @param config_dir_path A path to the directory containing config.json.
+    InputsEmbedderImpl(const Tokenizer& tokenizer,
+                       VisionEncoderImpl::Ptr vision_encoder_impl,
+                       EmbeddingsModelImpl::Ptr embeddings_model_impl,
+                       const std::filesystem::path& config_dir_path);
+
     // compute input embedding for prompt and multiple images
     ov::Tensor get_inputs_embeds(const std::string& prompt, const std::vector<ov::genai::EncodedImage>& images, ov::genai::VLMPerfMetrics& metrics, bool recalculate_merged_embeddings = true, const std::vector<size_t>& image_sequence = {});
 
@@ -256,6 +266,13 @@ private:
             const std::filesystem::path& config_dir_path,
             const std::string& device,
             const ov::AnyMap device_config);
+
+        /// @brief Constructs IInputsEmbedder from pre-loaded components.
+        IInputsEmbedder(
+            const VLMConfig& vlm_config,
+            const Tokenizer& tokenizer,
+            VisionEncoderImpl::Ptr vision_encoder_impl,
+            EmbeddingsModelImpl::Ptr embeddings_model_impl);
 
         virtual ov::Tensor apply_chat_template_tokenize(const std::string& prompt, ov::genai::VLMPerfMetrics& metrics);
 

@@ -17,6 +17,9 @@
 
 namespace ov::genai {
 
+// Forward declaration for friend access
+class VLMPipeline;
+
 /// @brief A class for computing input embeddings for Visual Language Models.
 /// This class combines text tokenization with vision encoding to produce
 /// embeddings that can be fed to a language model.
@@ -92,8 +95,14 @@ public:
     Tokenizer get_tokenizer() const;
 
 private:
-    class InputsEmbedderImpl;
-    std::unique_ptr<InputsEmbedderImpl> m_pimpl;
+    friend class VLMPipeline;
+    
+    /// @brief Get the internal InputsEmbedderImpl for use by friend classes.
+    /// @note This is only accessible by friend classes (e.g., VLMPipeline).
+    std::shared_ptr<class InputsEmbedderImpl> get_internal_impl() const;
+    
+    class InputsEmbedderImplWrapper;
+    std::unique_ptr<InputsEmbedderImplWrapper> m_pimpl;
 };
 
 } // namespace ov::genai

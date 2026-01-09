@@ -9,6 +9,7 @@
 #include "openvino/genai/visual_language/vision_encoder.hpp"
 #include "openvino/genai/visual_language/embeddings_model.hpp"
 #include "openvino/genai/visual_language/inputs_embedder.hpp"
+#include "openvino/genai/visual_language/pipeline.hpp"
 #include "openvino/openvino.hpp"
 
 // Helper function to load an image from file
@@ -137,6 +138,43 @@ void demo_from_components(const std::string& model_dir, const std::string& devic
     std::cout << "      in other parts of your application since they're shared_ptr." << std::endl;
 }
 
+// Demonstrates creating VLMPipeline with a pre-loaded InputsEmbedder
+void demo_vlm_pipeline_with_inputs_embedder(const std::string& model_dir, const std::string& device) {
+    std::cout << "\n=== Demo 3: Create VLMPipeline with pre-loaded InputsEmbedder ===" << std::endl;
+    
+    // Step 1: Create an InputsEmbedder as a shared pointer
+    std::cout << "\nStep 1: Creating InputsEmbedder::Ptr..." << std::endl;
+    auto inputs_embedder = std::make_shared<ov::genai::InputsEmbedder>(model_dir, device);
+    std::cout << "  - InputsEmbedder created" << std::endl;
+    
+    // Step 2: Create VLMPipeline with the pre-loaded InputsEmbedder
+    // The language model will be loaded from the same model_dir
+    std::cout << "\nStep 2: Creating VLMPipeline with InputsEmbedder::Ptr..." << std::endl;
+    ov::genai::VLMPipeline pipeline(
+        inputs_embedder,    // InputsEmbedder::Ptr
+        model_dir,          // Models path (for loading language model)
+        device              // Inference device
+    );
+    std::cout << "  - VLMPipeline created" << std::endl;
+    
+    // Step 3: Use the pipeline to generate text
+    std::cout << "\nStep 3: Generating text..." << std::endl;
+    
+    // Load a sample image
+    std::vector<ov::Tensor> images;
+    images.push_back(load_image("sample_image.png"));
+    
+    std::string prompt = "What is shown in this image?";
+    std::cout << "Prompt: " << prompt << std::endl;
+    
+    auto result = pipeline.generate(prompt, images);
+    std::cout << "Generated response: " << result.texts[0] << std::endl;
+    
+    // The InputsEmbedder can still be used independently
+    std::cout << "\nNote: The InputsEmbedder can be shared with other VLMPipelines" << std::endl;
+    std::cout << "      or used directly for custom embeddings computation." << std::endl;
+}
+
 int main(int argc, char* argv[]) {
     if (argc < 2) {
         std::cerr << "Usage: " << argv[0] << " <model_dir> [device]" << std::endl;
@@ -162,6 +200,9 @@ int main(int argc, char* argv[]) {
         
         // Demo 2: Advanced approach - create from pre-loaded components
         demo_from_components(model_dir, device);
+        
+        // Demo 3: Create VLMPipeline with pre-loaded InputsEmbedder
+        demo_vlm_pipeline_with_inputs_embedder(model_dir, device);
 
         std::cout << "\n=== All demos completed successfully! ===" << std::endl;
 

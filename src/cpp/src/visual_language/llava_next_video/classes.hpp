@@ -57,6 +57,12 @@ public:
         const std::filesystem::path& config_dir_path,
         const std::string& device,
         const ov::AnyMap device_config);
+
+    InputsEmbedderLLaVANextVideo(
+        const VLMConfig& vlm_config,
+        const Tokenizer& tokenizer,
+        VisionEncoderImpl::Ptr vision_encoder_impl,
+        EmbeddingsModelImpl::Ptr embeddings_model_impl);
         
     ov::Tensor get_inputs_embeds(
         const std::string& prompt,

@@ -67,6 +67,13 @@ InputsEmbedderGemma3::InputsEmbedderGemma3(
     const ov::AnyMap device_config) :
     IInputsEmbedder(vlm_config, models_map, tokenizer, config_dir_path, device, device_config) { }
 
+InputsEmbedderGemma3::InputsEmbedderGemma3(
+    const VLMConfig& vlm_config,
+    const Tokenizer& tokenizer,
+    VisionEncoderImpl::Ptr vision_encoder_impl,
+    EmbeddingsModelImpl::Ptr embeddings_model_impl) :
+    IInputsEmbedder(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl) { }
+
 bool InputsEmbedderGemma3::has_token_type_ids() const {
     return true;
 }

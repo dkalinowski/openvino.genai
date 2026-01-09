@@ -128,9 +128,9 @@ void EmbeddingsModelImpl::merge_postprocess(std::shared_ptr<ov::Model> model, fl
 // ======================== EmbeddingsModel (public API) ========================
 
 /// @brief The implementation class that wraps EmbeddingsModelImpl for the public API.
-class EmbeddingsModel::EmbeddingsModelImpl {
+class EmbeddingsModel::EmbeddingsModelImplWrapper {
 public:
-    EmbeddingsModelImpl(
+    EmbeddingsModelImplWrapper(
         const std::filesystem::path& model_dir,
         const std::string& device,
         const ov::AnyMap& properties)
@@ -140,7 +140,7 @@ public:
         m_impl = ov::genai::EmbeddingsModelImpl::create(model_dir, vlm_config.scale_emb, device, properties);
     }
 
-    EmbeddingsModelImpl(
+    EmbeddingsModelImplWrapper(
         const std::string& model,
         const ov::Tensor& weights,
         const std::string& device,
@@ -155,6 +155,10 @@ public:
         CircularBufferQueueElementGuard<EmbeddingsRequest> req_guard(queue.get());
         return m_impl->infer(req_guard.get(), input_ids, false);
     }
+    
+    ov::genai::EmbeddingsModelImpl::Ptr get_internal_impl() const {
+        return m_impl;
+    }
 
 private:
     ov::genai::EmbeddingsModelImpl::Ptr m_impl;
@@ -164,14 +168,14 @@ EmbeddingsModel::EmbeddingsModel(
     const std::filesystem::path& model_dir,
     const std::string& device,
     const ov::AnyMap& properties)
-    : m_pimpl(std::make_unique<EmbeddingsModelImpl>(model_dir, device, properties)) {}
+    : m_pimpl(std::make_unique<EmbeddingsModelImplWrapper>(model_dir, device, properties)) {}
 
 EmbeddingsModel::EmbeddingsModel(
     const std::string& model,
     const ov::Tensor& weights,
     const std::string& device,
     const ov::AnyMap& properties)
-    : m_pimpl(std::make_unique<EmbeddingsModelImpl>(model, weights, device, properties)) {}
+    : m_pimpl(std::make_unique<EmbeddingsModelImplWrapper>(model, weights, device, properties)) {}
 
 EmbeddingsModel::~EmbeddingsModel() = default;
 
@@ -181,6 +185,10 @@ EmbeddingsModel& EmbeddingsModel::operator=(EmbeddingsModel&& other) noexcept = 
 
 ov::Tensor EmbeddingsModel::infer(const ov::Tensor& input_ids) {
     return m_pimpl->infer(input_ids);
+}
+
+std::shared_ptr<EmbeddingsModelImpl> EmbeddingsModel::get_internal_impl() const {
+    return m_pimpl->get_internal_impl();
 }
 
 } // namespace genai

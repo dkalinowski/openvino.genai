@@ -78,8 +78,15 @@ public:
     }
 
 private:
-    class EmbeddingsModelImpl;
-    std::unique_ptr<EmbeddingsModelImpl> m_pimpl;
+    // Forward declaration of internal impl for friend access
+    friend class InputsEmbedder;
+    
+    /// @brief Get the internal impl for use by friend classes.
+    /// @note This is only accessible by friend classes.
+    std::shared_ptr<class EmbeddingsModelImpl> get_internal_impl() const;
+    
+    class EmbeddingsModelImplWrapper;
+    std::unique_ptr<EmbeddingsModelImplWrapper> m_pimpl;
 };
 
 } // namespace ov::genai

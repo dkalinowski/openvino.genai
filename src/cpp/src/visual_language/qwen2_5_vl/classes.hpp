@@ -34,6 +34,12 @@ public:
         const std::string& device,
         const ov::AnyMap device_config);
 
+    InputsEmbedderQwen2_5_VL(
+        const VLMConfig& vlm_config,
+        const Tokenizer& tokenizer,
+        VisionEncoderImpl::Ptr vision_encoder_impl,
+        EmbeddingsModelImpl::Ptr embeddings_model_impl);
+
 protected:
     std::pair<ov::Tensor, ov::Tensor> run_video_image_embeddings_merger(
         const std::vector<EncodedImage>& images, 

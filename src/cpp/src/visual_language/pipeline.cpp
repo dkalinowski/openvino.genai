@@ -279,6 +279,55 @@ public:
         m_sampler.set_seed(m_generation_config.rng_seed);
     }
 
+    VLMPipelineImpl(
+        std::shared_ptr<InputsEmbedderImpl> inputs_embedder_impl,
+        const std::filesystem::path& models_path,
+        const std::string& device,
+        const ov::AnyMap& properties,
+        const GenerationConfig& generation_config
+    ) :
+        m_generation_config{generation_config},
+        m_inputs_embedder(inputs_embedder_impl) {
+        m_is_npu = device.find("NPU") != std::string::npos;
+
+        auto properties_copy = properties;
+        auto language_model_path = models_path / "openvino_language_model.xml";
+        auto language_model = utils::singleton_core().read_model(language_model_path, {}, properties_copy);
+        auto kv_pos = ov::genai::utils::get_kv_axes_pos(language_model);
+
+        ov::CompiledModel compiled_language_model;
+        if (m_is_npu) {
+            utils::KVDesc kv_desc;
+            update_npu_properties(models_path, properties_copy);
+            std::tie(compiled_language_model, kv_desc) = utils::compile_decoder_for_npu(language_model, properties_copy, kv_pos);
+            m_max_prompt_len = kv_desc.max_prompt_len;
+            m_max_kv_cache_size = kv_desc.max_prompt_len + kv_desc.min_response_len;
+        } else {
+            compiled_language_model = utils::singleton_core().compile_model(language_model, device, properties_copy);
+        }
+        ov::genai::utils::print_compiled_model_properties(compiled_language_model, "VLM language model");
+
+        m_language = compiled_language_model.create_infer_request();
+        m_language.get_tensor("attention_mask").set_shape({1, 0});
+
+        m_tokenizer = m_inputs_embedder->get_tokenizer();
+        m_embedding = m_inputs_embedder->get_embedding_model();
+
+        // NPU is not supporting history, so in chat scenarios let's use full chat history on each iteration
+        m_use_full_chat_history = m_is_npu;
+
+        utils::KVCacheState& kv_cache_state = m_inputs_embedder->get_kv_cache_state();
+        kv_cache_state.seq_length_axis = kv_pos.seq_len;
+
+        // If eos_token_id was not provided, take value
+        if (m_generation_config.eos_token_id == -1) {
+            m_generation_config.set_eos_token_id(m_tokenizer.get_eos_token_id());
+        }
+
+        m_sampler.set_tokenizer(m_tokenizer);
+        m_sampler.set_seed(m_generation_config.rng_seed);
+    }
+
     VLMDecodedResults generate(
         const std::string& prompt,
         const std::vector<ov::Tensor>& images,
@@ -667,6 +716,26 @@ VLMPipeline::VLMPipeline(
 
     }
 
+    auto stop_time = std::chrono::steady_clock::now();
+    m_pimpl->set_load_time(std::chrono::duration_cast<std::chrono::milliseconds>(stop_time - start_time).count());
+}
+
+VLMPipeline::VLMPipeline(
+    InputsEmbedder::Ptr inputs_embedder,
+    const std::filesystem::path& models_path,
+    const std::string& device,
+    const ov::AnyMap& properties,
+    const GenerationConfig& generation_config
+) {
+    auto start_time = std::chrono::steady_clock::now();
+    
+    // Access the internal implementation via private method (friend access)
+    auto internal_impl = inputs_embedder->get_internal_impl();
+    OPENVINO_ASSERT(internal_impl != nullptr,
+        "InputsEmbedder must be constructed with model_dir to be used with VLMPipeline");
+    
+    m_pimpl = std::make_unique<VLMPipelineImpl>(internal_impl, models_path, device, properties, generation_config);
+    
     auto stop_time = std::chrono::steady_clock::now();
     m_pimpl->set_load_time(std::chrono::duration_cast<std::chrono::milliseconds>(stop_time - start_time).count());
 }

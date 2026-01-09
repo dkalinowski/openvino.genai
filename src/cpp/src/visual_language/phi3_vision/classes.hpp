@@ -59,6 +59,12 @@ public:
         const std::string& device,
         const ov::AnyMap device_config);
 
+    InputsEmbedderPhi3V(
+        const VLMConfig& vlm_config,
+        const Tokenizer& tokenizer,
+        VisionEncoderImpl::Ptr vision_encoder_impl,
+        EmbeddingsModelImpl::Ptr embeddings_model_impl);
+
     ov::Tensor get_inputs_embeds(const std::string& prompt, const std::vector<ov::genai::EncodedImage>& images, ov::genai::VLMPerfMetrics& metrics, bool recalculate_merged_embeddings = true, const std::vector<size_t>& image_sequence = {}) override;
 
     void update_chat_history(const std::string& decoded_results, const ov::genai::GenerationStatus generation_finish_status) override;

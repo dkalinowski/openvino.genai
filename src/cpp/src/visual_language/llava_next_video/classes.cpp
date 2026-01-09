@@ -194,6 +194,13 @@ InputsEmbedderLLaVANextVideo::InputsEmbedderLLaVANextVideo(
     const ov::AnyMap device_config) :
     InputsEmbedderLLaVANext(vlm_config, models_map, tokenizer, config_dir_path, device, device_config) { }
 
+InputsEmbedderLLaVANextVideo::InputsEmbedderLLaVANextVideo(
+    const VLMConfig& vlm_config,
+    const Tokenizer& tokenizer,
+    VisionEncoderImpl::Ptr vision_encoder_impl,
+    EmbeddingsModelImpl::Ptr embeddings_model_impl) :
+    InputsEmbedderLLaVANext(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl) { }
+
 
 ov::Tensor InputsEmbedderLLaVANextVideo::get_inputs_embeds(
     const std::string& prompt,

@@ -35,6 +35,12 @@ public:
         const std::string& device,
         const ov::AnyMap device_config);
 
+    InputsEmbedderLLaVA(
+        const VLMConfig& vlm_config,
+        const Tokenizer& tokenizer,
+        VisionEncoderImpl::Ptr vision_encoder_impl,
+        EmbeddingsModelImpl::Ptr embeddings_model_impl);
+
     ov::Tensor get_inputs_embeds(const std::string& prompt, const std::vector<ov::genai::EncodedImage>& images, ov::genai::VLMPerfMetrics& metrics, bool recalculate_merged_embeddings = true, const std::vector<size_t>& image_sequence = {}) override;
 
     std::vector<ov::genai::EncodedImage> encode_images(const std::vector<ov::Tensor>& images) override;

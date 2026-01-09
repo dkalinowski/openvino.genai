@@ -985,6 +985,19 @@ InputsEmbedderQwen2VL::InputsEmbedderQwen2VL(
     m_merge_length = std::pow(m_vision_encoder->get_processor_config().merge_size, 2);
 }
 
+InputsEmbedderQwen2VL::InputsEmbedderQwen2VL(
+    const VLMConfig& vlm_config,
+    const Tokenizer& tokenizer,
+    VisionEncoderImpl::Ptr vision_encoder_impl,
+    EmbeddingsModelImpl::Ptr embeddings_model_impl) :
+    IInputsEmbedder(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl) {
+    // Note: m_ireq_queue_vision_embeddings_merger is not initialized here
+    // This constructor is for basic use cases where the merger model is not needed.
+    // Full functionality requires loading from model_dir or models_map.
+    encode_vision_placeholder_tokens();
+    m_merge_length = std::pow(m_vision_encoder->get_processor_config().merge_size, 2);
+}
+
 void InputsEmbedderQwen2VL::encode_vision_placeholder_tokens() {
     auto encoded_vision_tokens = m_tokenizer.encode(
         m_vlm_config.vision_start_token + m_vlm_config.image_pad_token + m_vlm_config.video_pad_token,

@@ -75,6 +75,13 @@ InputsEmbedderLLaVA::InputsEmbedderLLaVA(
     const ov::AnyMap device_config) :
     IInputsEmbedder(vlm_config, models_map, tokenizer, config_dir_path, device, device_config) { }
 
+InputsEmbedderLLaVA::InputsEmbedderLLaVA(
+    const VLMConfig& vlm_config,
+    const Tokenizer& tokenizer,
+    VisionEncoderImpl::Ptr vision_encoder_impl,
+    EmbeddingsModelImpl::Ptr embeddings_model_impl) :
+    IInputsEmbedder(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl) { }
+
 std::vector<ov::genai::EncodedImage> InputsEmbedderLLaVA::encode_images(const std::vector<ov::Tensor>& images) {
     std::vector<EncodedImage> embeds;
     ov::AnyMap vision_config = {{"patch_size", m_vlm_config.vision_config_patch_size}};

@@ -799,4 +799,11 @@ InputsEmbedderMiniCPM::InputsEmbedderMiniCPM(
     const ov::AnyMap device_config) :
     IInputsEmbedder(vlm_config, models_map, tokenizer, config_dir_path, device, device_config) {}
 
+InputsEmbedderMiniCPM::InputsEmbedderMiniCPM(
+    const VLMConfig& vlm_config,
+    const Tokenizer& tokenizer,
+    VisionEncoderImpl::Ptr vision_encoder_impl,
+    EmbeddingsModelImpl::Ptr embeddings_model_impl) :
+    IInputsEmbedder(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl) {}
+
 } // namespace ov::genai
