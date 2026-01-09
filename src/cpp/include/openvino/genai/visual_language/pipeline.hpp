@@ -11,6 +11,7 @@
 #include "openvino/genai/streamer_base.hpp"
 #include "openvino/genai/tokenizer.hpp"
 #include "openvino/genai/visual_language/perf_metrics.hpp"
+#include "openvino/genai/visual_language/inputs_embedder.hpp"
 
 namespace ov::genai {
 

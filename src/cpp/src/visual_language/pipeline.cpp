@@ -60,7 +60,7 @@ class VLMPipeline::VLMPipelineImpl : public VLMPipelineBase{
     // True if chat mode is activated to save conversation
     // history between generate() calls.
     bool m_is_chat_conversation = false;
-    // InputsEmbedderImpl
+    // InputsEmbedderImpl (internal implementation)
     std::shared_ptr<InputsEmbedderImpl> m_inputs_embedder;
     // Component for applying sampling to lm outputs
     Sampler m_sampler;
