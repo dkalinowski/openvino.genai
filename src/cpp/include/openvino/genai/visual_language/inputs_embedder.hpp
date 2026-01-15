@@ -40,14 +40,6 @@ public:
         const std::string& device,
         const ov::AnyMap& device_config = {});
 
-    /// @brief Constructs the InputsEmbedder with a pre-loaded tokenizer.
-    /// @param tokenizer A pre-loaded tokenizer.
-    /// @param config_dir_path A path to the directory containing config.json
-    /// and model files for VLM configuration.
-    InputsEmbedder(
-        const Tokenizer& tokenizer,
-        const std::filesystem::path& config_dir_path);
-
     /// @brief Constructs the InputsEmbedder from pre-loaded components.
     /// @param tokenizer A pre-loaded tokenizer.
     /// @param vision_encoder A pre-loaded VisionEncoder.

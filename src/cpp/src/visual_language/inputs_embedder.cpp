@@ -535,17 +535,6 @@ public:
 
     InputsEmbedderImplWrapper(
         const Tokenizer& tokenizer,
-        const std::filesystem::path& config_dir_path)
-        : m_tokenizer_ptr(std::make_shared<Tokenizer>(tokenizer)),
-          m_config_dir_path(config_dir_path),
-          m_use_external_components(true)
-    {
-        // Read the VLM config to get model type information
-        m_vlm_config = utils::from_config_json_if_exists<VLMConfig>(config_dir_path, "config.json");
-    }
-
-    InputsEmbedderImplWrapper(
-        const Tokenizer& tokenizer,
         VisionEncoder::Ptr vision_encoder,
         EmbeddingsModel::Ptr embeddings_model,
         const std::filesystem::path& config_dir_path)
@@ -616,11 +605,6 @@ InputsEmbedder::InputsEmbedder(
     const std::string& device,
     const ov::AnyMap& device_config)
     : m_pimpl(std::make_unique<InputsEmbedderImplWrapper>(model_dir, device, device_config)) {}
-
-InputsEmbedder::InputsEmbedder(
-    const Tokenizer& tokenizer,
-    const std::filesystem::path& config_dir_path)
-    : m_pimpl(std::make_unique<InputsEmbedderImplWrapper>(tokenizer, config_dir_path)) {}
 
 InputsEmbedder::InputsEmbedder(
     const Tokenizer& tokenizer,
