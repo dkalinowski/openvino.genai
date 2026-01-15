@@ -536,9 +536,7 @@ public:
         VisionEncoder::Ptr vision_encoder,
         EmbeddingsModel::Ptr embeddings_model,
         const std::filesystem::path& config_dir_path)
-        : m_vision_encoder_ptr(vision_encoder),
-          m_embeddings_model_ptr(embeddings_model),
-          m_config_dir_path(config_dir_path)
+        : m_config_dir_path(config_dir_path)
     {
         // Read the VLM config to get model type information
         m_vlm_config = utils::from_config_json_if_exists<VLMConfig>(config_dir_path, "config.json");
@@ -584,9 +582,6 @@ private:
     ov::AnyMap m_device_config;
     
     // For external components mode
-    std::shared_ptr<Tokenizer> m_tokenizer_ptr;
-    std::shared_ptr<VisionEncoder> m_vision_encoder_ptr;
-    std::shared_ptr<EmbeddingsModel> m_embeddings_model_ptr;
     std::filesystem::path m_config_dir_path;
     VLMConfig m_vlm_config;
 };
