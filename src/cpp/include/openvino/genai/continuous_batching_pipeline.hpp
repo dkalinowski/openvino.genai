@@ -86,12 +86,6 @@ public:
                                const ov::AnyMap& tokenizer_properties = {},
                                const ov::AnyMap& vision_encoder_properties = {});
 
-    ContinuousBatchingPipeline(const std::filesystem::path& models_path,
-                               const SchedulerConfig& scheduler_config,
-                               const DeviceMapping& device_mapping,
-                               const ov::AnyMap& properties = {},
-                               const ov::AnyMap& tokenizer_properties = {},
-                               const ov::AnyMap& vision_encoder_properties = {});
     /**
     * @brief Constructs a ContinuousBatchingPipeline when ov::genai::Tokenizer is initialized manually using file from the different dirs.
     *

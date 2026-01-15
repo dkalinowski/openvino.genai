@@ -77,54 +77,6 @@ ContinuousBatchingPipeline::ContinuousBatchingPipeline( const std::filesystem::p
     m_impl->m_load_time_ms = get_load_time(start_time);
 }
 
-ContinuousBatchingPipeline::ContinuousBatchingPipeline( const std::filesystem::path& models_path,
-                                                        const SchedulerConfig& scheduler_config,
-                                                        const DeviceMapping& device_mapping,  // per-model device names: language/vision_embeddings/text_embeddings
-                                                        const ov::AnyMap& properties,
-                                                        const ov::AnyMap& tokenizer_properties,
-                                                        const ov::AnyMap& vision_encoder_properties) {
-    // Device mapping contains per-model device names
-    OPENVINO_ASSERT(device_mapping.find("language") != device_mapping.end(),
-        "Device mapping must contain 'language' key");
-    auto language_device = device_mapping.at("language");
-
-    auto start_time = std::chrono::steady_clock::now();
-    auto properties_without_draft_model = properties;
-    auto draft_model_desr = utils::extract_draft_model_from_config(properties_without_draft_model);
-    auto is_prompt_lookup_enabled = extract_prompt_lookup_from_config(properties_without_draft_model);
-
-    auto model = utils::read_model(models_path, properties);
-    auto [properties_without_draft_model_without_gguf, enable_save_ov_model] = utils::extract_gguf_properties(properties_without_draft_model);
-    properties_without_draft_model_without_gguf[ov::cache_model_path.name()] = models_path;
-    auto tokenizer = ov::genai::Tokenizer(models_path, tokenizer_properties);
-    auto generation_config = utils::from_config_json_if_exists(models_path);
-
-    std::shared_ptr<InputsEmbedderImpl> embedder;
-    if (std::filesystem::exists(models_path / "openvino_text_embeddings_model.xml")) {
-        //embedder = std::make_shared<InputsEmbedderImpl>(models_path, device, vision_encoder_properties);  // previously used single device for embedder
-        embedder = std::make_shared<InputsEmbedderImpl>(models_path, device_mapping, properties/*? should be text embedd properties only*/, vision_encoder_properties);  // new version with per-model devices, mapping is used underneath to deduce which device
-    }
-
-    utils::print_scheduler_config_info(scheduler_config);
-
-    if (is_prompt_lookup_enabled) {
-        OPENVINO_ASSERT(draft_model_desr.model == nullptr, "Speculative decoding and prompt lookup decoding are mutually exclusive");
-        OPENVINO_ASSERT(embedder == nullptr, "Prompt lookup decoding is not supported for models with embeddings");
-        m_impl = std::make_shared<PromptLookupImpl>(model, tokenizer, scheduler_config, language_device, properties_without_draft_model_without_gguf, generation_config);
-    } else if (draft_model_desr.model != nullptr) {
-        OPENVINO_ASSERT(embedder == nullptr, "Speculative decoding is not supported for models with embeddings");
-        auto main_model_descr = ov::genai::ModelDesc(model, tokenizer, language_device, properties_without_draft_model_without_gguf, scheduler_config, generation_config);
-        m_impl = std::make_shared<SpeculativeDecodingImpl>(main_model_descr, draft_model_desr);
-    } else if (embedder) {
-        m_impl = std::make_shared<ContinuousBatchingImpl>(model, embedder, tokenizer, scheduler_config, language_device, properties_without_draft_model_without_gguf, generation_config);
-    }
-    else {
-        m_impl = std::make_shared<ContinuousBatchingImpl>(model, tokenizer, scheduler_config, language_device, properties_without_draft_model_without_gguf, generation_config);
-    }
-
-    m_impl->m_load_time_ms = get_load_time(start_time);
-}
-
 ContinuousBatchingPipeline::ContinuousBatchingPipeline(
     const std::filesystem::path& models_path,
     const Tokenizer& tokenizer,

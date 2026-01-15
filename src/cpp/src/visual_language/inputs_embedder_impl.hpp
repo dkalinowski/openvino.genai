@@ -36,11 +36,6 @@ public:
                        const std::string& device,
                        const ov::AnyMap device_config);
 
-    InputsEmbedderImpl(const std::filesystem::path& model_dir,
-                       const DeviceMapping& device_mapping,
-                       const ov::AnyMap text_device_config,
-                       const ov::AnyMap vision_device_config);
-
     InputsEmbedderImpl(const ModelsMap& models_map,
                        const Tokenizer& tokenizer,
                        const std::filesystem::path& config_dir_path,
@@ -251,13 +246,6 @@ private:
             const std::filesystem::path& model_dir,
             const std::string& device,
             const ov::AnyMap device_config);
-
-        IInputsEmbedder(
-            const VLMConfig& vlm_config,
-            const std::filesystem::path& model_dir,
-            const DeviceMapping& device_mapping,
-            const ov::AnyMap text_device_config,
-            const ov::AnyMap vision_device_config);
 
         IInputsEmbedder(
             const VLMConfig& vlm_config,

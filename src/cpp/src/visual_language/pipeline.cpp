@@ -34,13 +34,6 @@ void update_npu_properties(const std::filesystem::path& models_dir, ov::AnyMap& 
     }
 }
 
-bool is_llm_device_npu(const DeviceMapping& device_mapping) {
-    auto it = device_mapping.find("language");
-    if (it != device_mapping.end()) {
-        return it->second.find("NPU") != std::string::npos;
-    }
-    return false;
-}
 }
 
 class VLMPipeline::VLMPipelineImpl : public VLMPipelineBase{
@@ -128,106 +121,6 @@ public:
             : utils::pop_or_default<ov::AnyMap>(device_propertes, embedder_device, {});
 
         m_inputs_embedder = std::make_shared<InputsEmbedderImpl>(models_dir, embedder_device, embedder_properties);
-        m_tokenizer = m_inputs_embedder->get_tokenizer();
-        m_embedding = m_inputs_embedder->get_embedding_model();
-        // NPU is not supporting history, so in chat scenarios let's use full chat history on each iteration
-        m_use_full_chat_history = m_is_npu;
-
-        utils::KVCacheState& kv_cache_state = m_inputs_embedder->get_kv_cache_state();
-        kv_cache_state.seq_length_axis = kv_pos.seq_len;
-
-        // If eos_token_id was not provided, take value
-        if (m_generation_config.eos_token_id == -1) {
-            m_generation_config.set_eos_token_id(m_tokenizer.get_eos_token_id());
-        }
-
-        m_sampler.set_tokenizer(m_tokenizer);
-        m_sampler.set_seed(m_generation_config.rng_seed);
-    }
-
-    VLMPipelineImpl(
-        const std::filesystem::path& models_dir,
-        const DeviceMapping& device_mapping,
-        const ov::AnyMap& properties
-    ) :
-        m_generation_config{
-            utils::from_config_json_if_exists<GenerationConfig>(
-                models_dir, "generation_config.json"
-            )
-        } {
-        std::cout << "Device mapping:" << std::endl;
-        for (const auto& [model_name, device_name] : device_mapping) {
-            std::cout << " " << model_name << ": " << device_name << std::endl;
-        }
-
-        //m_is_npu = device.find("NPU") != std::string::npos;
-        m_is_npu = is_llm_device_npu(device_mapping);
-
-        auto properties_copy = properties;
-        auto language_model_path = models_dir / "openvino_language_model.xml";
-        auto language_model =  utils::singleton_core().read_model(language_model_path, {}, properties_copy);
-        auto kv_pos = ov::genai::utils::get_kv_axes_pos(language_model);
-
-        // In case user provided properties per-device
-        // {
-        //     ov::device::properties("NPU", ...),
-        //     ov::device::properties("CPU", ...)
-        // }
-        auto device_propertes = utils::pop_or_default<ov::AnyMap>(
-            properties_copy, ov::device::properties.name(), { }
-        );
-        // Otherwise, the same properties are used for all models and devices
-        OPENVINO_ASSERT(device_mapping.find("language") != device_mapping.end(),
-            "Device mapping must contain 'language' key");
-        auto lm_properties = device_propertes.empty()
-            ? properties_copy
-            : utils::pop_or_default<ov::AnyMap>(device_propertes, device_mapping.at("language"), {});
-
-        ov::CompiledModel compiled_language_model;
-        //auto embedder_device = device;
-        if (m_is_npu) {
-            //embedder_device = "CPU";
-            utils::KVDesc kv_desc;
-            update_npu_properties(models_dir, lm_properties);
-
-            // measure time
-            auto start_time = std::chrono::steady_clock::now();
-            std::tie(compiled_language_model, kv_desc) = utils::compile_decoder_for_npu(language_model, lm_properties, kv_pos);
-            auto end_time = std::chrono::steady_clock::now();
-            auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
-            std::cout << "Compilation time for language model on NPU: " << duration_ms << " ms" << std::endl;
-
-            m_max_prompt_len = kv_desc.max_prompt_len;
-            m_max_kv_cache_size = kv_desc.max_prompt_len + kv_desc.min_response_len;
-        } else {
-            // Measure time
-            auto start_time = std::chrono::steady_clock::now();
-            compiled_language_model = utils::singleton_core().compile_model(language_model, device_mapping.at("language"), lm_properties);
-            auto end_time = std::chrono::steady_clock::now();
-            auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
-            std::cout << "Compilation time for language model on " << device_mapping.at("language") << ": " << duration_ms << " ms" << std::endl;
-        }
-        ov::genai::utils::print_compiled_model_properties(compiled_language_model, "VLM language model");
-
-        m_language = compiled_language_model.create_infer_request();
-        m_language.get_tensor("attention_mask").set_shape({1, 0});
-
-        // auto embedder_properties = device_propertes.empty()
-        //     ? properties_copy
-        //     : utils::pop_or_default<ov::AnyMap>(device_propertes, embedder_device, {});
-
-        OPENVINO_ASSERT(device_mapping.find("vision_embeddings") != device_mapping.end(),
-            "Device mapping must contain 'vision_embeddings' key");
-        OPENVINO_ASSERT(device_mapping.find("text_embeddings") != device_mapping.end(),
-            "Device mapping must contain 'text_embeddings' key");
-        auto text_embedder_properties = device_propertes.empty()
-            ? properties_copy
-            : utils::pop_or_default<ov::AnyMap>(device_propertes, device_mapping.at("text_embeddings"), {});
-        auto vision_embedder_properties = device_propertes.empty()
-            ? properties_copy
-            : utils::pop_or_default<ov::AnyMap>(device_propertes, device_mapping.at("vision_embeddings"), {});
-
-        m_inputs_embedder = std::make_shared<InputsEmbedderImpl>(models_dir, device_mapping, text_embedder_properties, vision_embedder_properties);
         m_tokenizer = m_inputs_embedder->get_tokenizer();
         m_embedding = m_inputs_embedder->get_embedding_model();
         // NPU is not supporting history, so in chat scenarios let's use full chat history on each iteration
@@ -627,48 +520,6 @@ VLMPipeline::VLMPipeline(
 
         if (m_pimpl == nullptr) {
             m_pimpl = std::make_unique<VLMPipelineImpl>(models_dir, device, properties);
-        }
-    }
-
-    auto stop_time = std::chrono::steady_clock::now();
-    m_pimpl->set_load_time(std::chrono::duration_cast<std::chrono::milliseconds>(stop_time - start_time).count());
-}
-
-VLMPipeline::VLMPipeline(
-    const std::filesystem::path& models_dir,
-    const DeviceMapping& device_mapping,
-    const ov::AnyMap& user_properties
-) {
-    auto start_time = std::chrono::steady_clock::now();
-
-    auto [properties, attention_backend] = utils::extract_attention_backend(user_properties);
-    if (is_llm_device_npu(device_mapping)) {
-        auto it = properties.find("scheduler_config");
-        OPENVINO_ASSERT(it == properties.end(), "scheduler_config should be removed for VLMPipeline initialization");
-        m_pimpl = std::make_unique<VLMPipelineImpl>(models_dir, device_mapping, properties);
-    } else {
-        // TODO
-
-    //     // If CB is invoked explicitly, create CB adapter as is and re-throw in case if internal issues
-    //     if (utils::explicitly_requires_paged_attention(user_properties)) {
-    //         auto [plugin_properties, scheduler_config] = utils::extract_scheduler_config(properties, utils::get_latency_oriented_scheduler_config());
-    //         m_pimpl = std::make_unique<VLMContinuousBatchingAdapter>(models_dir, scheduler_config, device_mapping, plugin_properties);
-    //     } else if (attention_backend == PA_BACKEND && !requires_sdpa(models_dir)) {
-    //         // try to call CB adapter one more time, but with safe guard to silent exception
-    //         try {
-    //             auto [plugin_properties, scheduler_config] = utils::extract_scheduler_config(properties, utils::get_latency_oriented_scheduler_config());
-    //             // we need use CB only for x86 and arm64, as for other architectures like risc-v we can create Paged Attention based model
-    //             // but cannot perform its inference later
-    // #if defined(OPENVINO_ARCH_X86_64) || defined(OPENVINO_ARCH_ARM64)
-    //             m_pimpl = std::make_unique<VLMContinuousBatchingAdapter>(models_dir, scheduler_config, device_mapping, plugin_properties);
-    // #endif
-    //         } catch (ov::Exception&) {
-    //             // ignore exceptions from PA
-    //         }
-    //     }
-
-        if (m_pimpl == nullptr) {
-            m_pimpl = std::make_unique<VLMPipelineImpl>(models_dir, device_mapping, properties);
         }
     }
 

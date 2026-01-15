@@ -77,17 +77,6 @@ InputsEmbedderImpl::IInputsEmbedder::IInputsEmbedder(
 
 InputsEmbedderImpl::IInputsEmbedder::IInputsEmbedder(
         const VLMConfig& vlm_config,
-        const std::filesystem::path& model_dir,
-        const DeviceMapping& device_mapping,
-        const ov::AnyMap text_device_config,
-        const ov::AnyMap vision_device_config) :
-    m_vlm_config{vlm_config},
-    m_vision_encoder(VisionEncoderImpl::create(model_dir, m_vlm_config.model_type, device_mapping.at("vision_embeddings"), vision_device_config)),
-    m_embedding(EmbeddingsModelImpl::create(model_dir, m_vlm_config.scale_emb, device_mapping.at("text_embeddings"), text_device_config)),
-    m_tokenizer{model_dir, text_device_config} { }
-
-InputsEmbedderImpl::IInputsEmbedder::IInputsEmbedder(
-        const VLMConfig& vlm_config,
         const ModelsMap& models_map,
         const Tokenizer& tokenizer,
         const std::filesystem::path& config_dir_path,
@@ -291,47 +280,6 @@ InputsEmbedderImpl::InputsEmbedderImpl(const std::filesystem::path& model_dir,
         m_impl = std::make_shared<InputsEmbedderQwen2_5_VL>(vlm_config, model_dir, device, device_config);
     } else if (vlm_config.model_type == VLMModelType::GEMMA3) {
         m_impl = std::make_shared<InputsEmbedderGemma3>(vlm_config, model_dir, device, device_config);
-    } else {
-        OPENVINO_THROW("Unsupported model type in VLM InputsEmbedder class. Please, create feature request on new model support");
-    }
-}
-
-InputsEmbedderImpl::InputsEmbedderImpl(const std::filesystem::path& model_dir,
-                               const DeviceMapping& device_mapping,
-                               const ov::AnyMap text_device_config,
-                               const ov::AnyMap vision_device_config) {
-    auto vlm_config = utils::from_config_json_if_exists<VLMConfig>(model_dir, "config.json");
-
-    // if (vlm_config.model_type == VLMModelType::MINICPM) {
-    //     m_impl = std::make_shared<InputsEmbedderMiniCPM>(vlm_config, model_dir, device, device_config);
-    // } else if (vlm_config.model_type == VLMModelType::LLAVA) {
-    //     m_impl = std::make_shared<InputsEmbedderLLaVA>(vlm_config, model_dir, device, device_config);
-    // } else if (vlm_config.model_type == VLMModelType::NANOLLAVA) {
-    //     m_impl = std::make_shared<InputsEmbedderNanoLLaVA>(vlm_config, model_dir, device, device_config);
-    // } else if (vlm_config.model_type == VLMModelType::LLAVA_NEXT) {
-    //     m_impl = std::make_shared<InputsEmbedderLLaVANext>(vlm_config, model_dir, device, device_config);
-    // } else if (vlm_config.model_type == VLMModelType::LLAVA_NEXT_VIDEO) {
-    //     m_impl = std::make_shared<InputsEmbedderLLaVANextVideo>(vlm_config, model_dir, device, device_config);
-    // } else if (vlm_config.model_type == VLMModelType::INTERNVL_CHAT) {
-    //     m_impl = std::make_shared<InputsEmbedderInternVLChat>(vlm_config, model_dir, device, device_config);
-    // } else if (vlm_config.model_type == VLMModelType::PHI3_V) {
-    //     m_impl = std::make_shared<InputsEmbedderPhi3V>(vlm_config, model_dir, device, device_config);
-    // } else if (vlm_config.model_type == VLMModelType::PHI4MM) {
-    //     m_impl = std::make_shared<InputsEmbedderPhi4MM>(vlm_config, model_dir, device, device_config);
-    // } else if (vlm_config.model_type == VLMModelType::QWEN2_VL) {
-    //     m_impl = std::make_shared<InputsEmbedderQwen2VL>(vlm_config, model_dir, device, device_config);
-    // } else if (vlm_config.model_type == VLMModelType::QWEN2_5_VL) {
-    //     m_impl = std::make_shared<InputsEmbedderQwen2_5_VL>(vlm_config, model_dir, device, device_config);
-    // } else if (vlm_config.model_type == VLMModelType::GEMMA3) {
-    //     m_impl = std::make_shared<InputsEmbedderGemma3>(vlm_config, model_dir, device, device_config);
-    // } else {
-    //     OPENVINO_THROW("Unsupported model type in VLM InputsEmbedder class. Please, create feature request on new model support");
-    // }
-
-    // Remaining classes implementation will follow once api change suggestion is approved
-
-    if (vlm_config.model_type == VLMModelType::INTERNVL_CHAT) {
-        m_impl = std::make_shared<InputsEmbedderInternVLChat>(vlm_config, model_dir, device_mapping, text_device_config, vision_device_config);
     } else {
         OPENVINO_THROW("Unsupported model type in VLM InputsEmbedder class. Please, create feature request on new model support");
     }
