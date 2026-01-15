@@ -101,13 +101,13 @@ InputsEmbedderImpl::IInputsEmbedder::IInputsEmbedder(
 
 InputsEmbedderImpl::IInputsEmbedder::IInputsEmbedder(
         const VLMConfig& vlm_config,
-        const Tokenizer& tokenizer,
         VisionEncoderImpl::Ptr vision_encoder_impl,
-        EmbeddingsModelImpl::Ptr embeddings_model_impl) :
+        EmbeddingsModelImpl::Ptr embeddings_model_impl,
+        const std::filesystem::path& config_dir_path) :
     m_vlm_config{vlm_config},
     m_vision_encoder(vision_encoder_impl),
     m_embedding(embeddings_model_impl),
-    m_tokenizer(tokenizer) { }
+    m_tokenizer(config_dir_path) { }
 
 ov::Tensor InputsEmbedderImpl::IInputsEmbedder::apply_chat_template_tokenize(const std::string& prompt, ov::genai::VLMPerfMetrics& metrics) {
     bool add_special_tokens = m_add_special_tokens_is_set ? m_add_special_tokens : !(m_is_chat_conversation || m_apply_chat_template);
@@ -319,34 +319,33 @@ InputsEmbedderImpl::InputsEmbedderImpl(const ModelsMap& models_map,
     }
 }
 
-InputsEmbedderImpl::InputsEmbedderImpl(const Tokenizer& tokenizer,
-                               VisionEncoderImpl::Ptr vision_encoder_impl,
+InputsEmbedderImpl::InputsEmbedderImpl(VisionEncoderImpl::Ptr vision_encoder_impl,
                                EmbeddingsModelImpl::Ptr embeddings_model_impl,
                                const std::filesystem::path& config_dir_path) {
     auto vlm_config = utils::from_config_json_if_exists<VLMConfig>(config_dir_path, "config.json");
 
     if (vlm_config.model_type == VLMModelType::MINICPM) {
-        m_impl = std::make_shared<InputsEmbedderMiniCPM>(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl);
+        m_impl = std::make_shared<InputsEmbedderMiniCPM>(vlm_config, vision_encoder_impl, embeddings_model_impl, config_dir_path);
     } else if (vlm_config.model_type == VLMModelType::LLAVA) {
-        m_impl = std::make_shared<InputsEmbedderLLaVA>(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl);
+        m_impl = std::make_shared<InputsEmbedderLLaVA>(vlm_config, vision_encoder_impl, embeddings_model_impl, config_dir_path);
     } else if (vlm_config.model_type == VLMModelType::NANOLLAVA) {
-        m_impl = std::make_shared<InputsEmbedderNanoLLaVA>(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl);
+        m_impl = std::make_shared<InputsEmbedderNanoLLaVA>(vlm_config, vision_encoder_impl, embeddings_model_impl, config_dir_path);
     } else if (vlm_config.model_type == VLMModelType::LLAVA_NEXT) {
-        m_impl = std::make_shared<InputsEmbedderLLaVANext>(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl);
+        m_impl = std::make_shared<InputsEmbedderLLaVANext>(vlm_config, vision_encoder_impl, embeddings_model_impl, config_dir_path);
     } else if (vlm_config.model_type == VLMModelType::LLAVA_NEXT_VIDEO) {
-        m_impl = std::make_shared<InputsEmbedderLLaVANextVideo>(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl);
+        m_impl = std::make_shared<InputsEmbedderLLaVANextVideo>(vlm_config, vision_encoder_impl, embeddings_model_impl, config_dir_path);
     } else if (vlm_config.model_type == VLMModelType::INTERNVL_CHAT) {
-        m_impl = std::make_shared<InputsEmbedderInternVLChat>(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl);
+        m_impl = std::make_shared<InputsEmbedderInternVLChat>(vlm_config, vision_encoder_impl, embeddings_model_impl, config_dir_path);
     } else if (vlm_config.model_type == VLMModelType::PHI3_V) {
-        m_impl = std::make_shared<InputsEmbedderPhi3V>(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl);
+        m_impl = std::make_shared<InputsEmbedderPhi3V>(vlm_config, vision_encoder_impl, embeddings_model_impl, config_dir_path);
     } else if (vlm_config.model_type == VLMModelType::PHI4MM) {
-        m_impl = std::make_shared<InputsEmbedderPhi4MM>(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl);
+        m_impl = std::make_shared<InputsEmbedderPhi4MM>(vlm_config, vision_encoder_impl, embeddings_model_impl, config_dir_path);
     } else if (vlm_config.model_type == VLMModelType::QWEN2_VL) {
-        m_impl = std::make_shared<InputsEmbedderQwen2VL>(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl);
+        m_impl = std::make_shared<InputsEmbedderQwen2VL>(vlm_config, vision_encoder_impl, embeddings_model_impl, config_dir_path);
     } else if (vlm_config.model_type == VLMModelType::QWEN2_5_VL) {
-        m_impl = std::make_shared<InputsEmbedderQwen2_5_VL>(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl);
+        m_impl = std::make_shared<InputsEmbedderQwen2_5_VL>(vlm_config, vision_encoder_impl, embeddings_model_impl, config_dir_path);
     } else if (vlm_config.model_type == VLMModelType::GEMMA3) {
-        m_impl = std::make_shared<InputsEmbedderGemma3>(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl);
+        m_impl = std::make_shared<InputsEmbedderGemma3>(vlm_config, vision_encoder_impl, embeddings_model_impl, config_dir_path);
     } else {
         OPENVINO_THROW("Unsupported model type in VLM InputsEmbedder class. Please, create feature request on new model support");
     }
@@ -534,15 +533,12 @@ public:
           m_device_config(device_config) {}
 
     InputsEmbedderImplWrapper(
-        const Tokenizer& tokenizer,
         VisionEncoder::Ptr vision_encoder,
         EmbeddingsModel::Ptr embeddings_model,
         const std::filesystem::path& config_dir_path)
-        : m_tokenizer_ptr(std::make_shared<Tokenizer>(tokenizer)),
-          m_vision_encoder_ptr(vision_encoder),
+        : m_vision_encoder_ptr(vision_encoder),
           m_embeddings_model_ptr(embeddings_model),
-          m_config_dir_path(config_dir_path),
-          m_use_external_components(true)
+          m_config_dir_path(config_dir_path)
     {
         // Read the VLM config to get model type information
         m_vlm_config = utils::from_config_json_if_exists<VLMConfig>(config_dir_path, "config.json");
@@ -550,7 +546,6 @@ public:
         // Create internal impl using the pre-loaded components
         // This allows the InputsEmbedder to work with VLMPipeline
         m_internal_impl = std::make_shared<ov::genai::InputsEmbedderImpl>(
-            tokenizer,
             vision_encoder->get_internal_impl(),
             embeddings_model->get_internal_impl(),
             config_dir_path
@@ -571,9 +566,6 @@ public:
     }
 
     Tokenizer get_tokenizer() const {
-        if (m_use_external_components && m_tokenizer_ptr) {
-            return *m_tokenizer_ptr;
-        }
         return m_internal_impl->get_tokenizer();
     }
 
@@ -597,7 +589,6 @@ private:
     std::shared_ptr<EmbeddingsModel> m_embeddings_model_ptr;
     std::filesystem::path m_config_dir_path;
     VLMConfig m_vlm_config;
-    bool m_use_external_components = false;
 };
 
 InputsEmbedder::InputsEmbedder(
@@ -607,11 +598,10 @@ InputsEmbedder::InputsEmbedder(
     : m_pimpl(std::make_unique<InputsEmbedderImplWrapper>(model_dir, device, device_config)) {}
 
 InputsEmbedder::InputsEmbedder(
-    const Tokenizer& tokenizer,
     VisionEncoder::Ptr vision_encoder,
     EmbeddingsModel::Ptr embeddings_model,
     const std::filesystem::path& config_dir_path)
-    : m_pimpl(std::make_unique<InputsEmbedderImplWrapper>(tokenizer, vision_encoder, embeddings_model, config_dir_path)) {}
+    : m_pimpl(std::make_unique<InputsEmbedderImplWrapper>(vision_encoder, embeddings_model, config_dir_path)) {}
 
 InputsEmbedder::~InputsEmbedder() = default;
 

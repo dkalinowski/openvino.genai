@@ -391,10 +391,10 @@ InputsEmbedderInternVLChat::InputsEmbedderInternVLChat(
 
 InputsEmbedderInternVLChat::InputsEmbedderInternVLChat(
     const VLMConfig& vlm_config,
-    const Tokenizer& tokenizer,
     VisionEncoderImpl::Ptr vision_encoder_impl,
-    EmbeddingsModelImpl::Ptr embeddings_model_impl) :
-    IInputsEmbedder(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl) { }
+    EmbeddingsModelImpl::Ptr embeddings_model_impl,
+    const std::filesystem::path& config_dir_path) :
+    IInputsEmbedder(vlm_config, vision_encoder_impl, embeddings_model_impl, config_dir_path) { }
 
 
 NormalizedPrompt InputsEmbedderInternVLChat::normalize_prompt(const std::string& prompt, size_t base_id, const std::vector<EncodedImage>& images) const {

@@ -109,10 +109,10 @@ InputsEmbedderQwen2_5_VL::InputsEmbedderQwen2_5_VL(
 
 InputsEmbedderQwen2_5_VL::InputsEmbedderQwen2_5_VL(
     const VLMConfig& vlm_config,
-    const Tokenizer& tokenizer,
     VisionEncoderImpl::Ptr vision_encoder_impl,
-    EmbeddingsModelImpl::Ptr embeddings_model_impl) :
-    InputsEmbedderQwen2VL(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl) {}
+    EmbeddingsModelImpl::Ptr embeddings_model_impl,
+    const std::filesystem::path& config_dir_path) :
+    InputsEmbedderQwen2VL(vlm_config, vision_encoder_impl, embeddings_model_impl, config_dir_path) {}
 
 std::pair<ov::Tensor, ov::Tensor> InputsEmbedderQwen2_5_VL::run_video_image_embeddings_merger(
     const std::vector<EncodedImage>& images, 

@@ -69,10 +69,10 @@ InputsEmbedderGemma3::InputsEmbedderGemma3(
 
 InputsEmbedderGemma3::InputsEmbedderGemma3(
     const VLMConfig& vlm_config,
-    const Tokenizer& tokenizer,
     VisionEncoderImpl::Ptr vision_encoder_impl,
-    EmbeddingsModelImpl::Ptr embeddings_model_impl) :
-    IInputsEmbedder(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl) { }
+    EmbeddingsModelImpl::Ptr embeddings_model_impl,
+    const std::filesystem::path& config_dir_path) :
+    IInputsEmbedder(vlm_config, vision_encoder_impl, embeddings_model_impl, config_dir_path) { }
 
 bool InputsEmbedderGemma3::has_token_type_ids() const {
     return true;

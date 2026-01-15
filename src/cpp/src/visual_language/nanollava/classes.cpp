@@ -129,10 +129,10 @@ InputsEmbedderNanoLLaVA::InputsEmbedderNanoLLaVA(
 
 InputsEmbedderNanoLLaVA::InputsEmbedderNanoLLaVA(
     const VLMConfig& vlm_config,
-    const Tokenizer& tokenizer,
     VisionEncoderImpl::Ptr vision_encoder_impl,
-    EmbeddingsModelImpl::Ptr embeddings_model_impl) :
-    IInputsEmbedder(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl) { }
+    EmbeddingsModelImpl::Ptr embeddings_model_impl,
+    const std::filesystem::path& config_dir_path) :
+    IInputsEmbedder(vlm_config, vision_encoder_impl, embeddings_model_impl, config_dir_path) { }
 
 std::vector<ov::genai::EncodedImage> InputsEmbedderNanoLLaVA::encode_images(const std::vector<ov::Tensor>& images) {
     std::vector<EncodedImage> embeds;

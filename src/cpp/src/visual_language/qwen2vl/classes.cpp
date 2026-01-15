@@ -987,10 +987,10 @@ InputsEmbedderQwen2VL::InputsEmbedderQwen2VL(
 
 InputsEmbedderQwen2VL::InputsEmbedderQwen2VL(
     const VLMConfig& vlm_config,
-    const Tokenizer& tokenizer,
     VisionEncoderImpl::Ptr vision_encoder_impl,
-    EmbeddingsModelImpl::Ptr embeddings_model_impl) :
-    IInputsEmbedder(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl) {
+    EmbeddingsModelImpl::Ptr embeddings_model_impl,
+    const std::filesystem::path& config_dir_path) :
+    IInputsEmbedder(vlm_config, vision_encoder_impl, embeddings_model_impl, config_dir_path) {
     // Note: m_ireq_queue_vision_embeddings_merger is not initialized here
     // This constructor is for basic use cases where the merger model is not needed.
     // Full functionality requires loading from model_dir or models_map.

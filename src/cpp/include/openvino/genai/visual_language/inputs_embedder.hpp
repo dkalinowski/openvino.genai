@@ -47,7 +47,6 @@ public:
     /// @param config_dir_path A path to the directory containing config.json
     /// for VLM configuration.
     InputsEmbedder(
-        const Tokenizer& tokenizer,
         VisionEncoder::Ptr vision_encoder,
         EmbeddingsModel::Ptr embeddings_model,
         const std::filesystem::path& config_dir_path);

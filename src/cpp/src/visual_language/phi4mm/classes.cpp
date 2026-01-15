@@ -780,10 +780,10 @@ InputsEmbedderPhi4MM::InputsEmbedderPhi4MM(
 
 InputsEmbedderPhi4MM::InputsEmbedderPhi4MM(
     const VLMConfig& vlm_config,
-    const Tokenizer& tokenizer,
     VisionEncoderImpl::Ptr vision_encoder_impl,
-    EmbeddingsModelImpl::Ptr embeddings_model_impl) :
-    IInputsEmbedder(vlm_config, tokenizer, vision_encoder_impl, embeddings_model_impl) {}
+    EmbeddingsModelImpl::Ptr embeddings_model_impl,
+    const std::filesystem::path& config_dir_path) :
+    IInputsEmbedder(vlm_config, vision_encoder_impl, embeddings_model_impl, config_dir_path) {}
 
 NormalizedPrompt InputsEmbedderPhi4MM::normalize_prompt(const std::string& prompt, size_t base_id, const std::vector<EncodedImage>& images) const {
     return {phi_utils::normalize_prompt(prompt, base_id, images.size(), NATIVE_PATTERN, write_native), {}, {}};
