@@ -65,13 +65,13 @@ public:
     /// @brief Default destructor.
     ~InputsEmbedder();
 
-    /// @brief Encode images into image embeddings.
+    /// @brief Encode images into image embeddings. Allows for concurrent usage.
     /// @param images A vector of image tensors with shape [1, H, W, C] or [H, W, C]
     /// in NHWC layout with RGB channel order.
     /// @return A vector of EncodedImage structures containing the image embeddings.
     std::vector<EncodedImage> encode_images(const std::vector<ov::Tensor>& images);
 
-    /// @brief Compute input embeddings for a text prompt with images.
+    /// @brief Compute input embeddings for a text prompt with images. Allows for concurrent usage.
     /// This method tokenizes the prompt, encodes the images, and combines them
     /// into a single embeddings tensor suitable for language model input.
     /// @param prompt The text prompt, which may contain image placeholders.

@@ -60,7 +60,7 @@ public:
     /// @brief Move assignment operator.
     EmbeddingsModel& operator=(EmbeddingsModel&& other) noexcept;
 
-    /// @brief Compute embeddings for the given input token IDs.
+    /// @brief Compute embeddings for the given input token IDs. Allows for concurrent usage.
     /// @param input_ids Input token IDs tensor with shape [batch_size, sequence_length].
     /// @return Embeddings tensor with shape [batch_size, sequence_length, hidden_size].
     ov::Tensor infer(const ov::Tensor& input_ids);
