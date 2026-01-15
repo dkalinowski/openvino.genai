@@ -174,29 +174,29 @@ public:
 
     VLMPipelineImpl(
         std::shared_ptr<InputsEmbedderImpl> inputs_embedder_impl,
-        const std::filesystem::path& models_path,
-        const std::string& device,
-        const ov::AnyMap& properties,
+        const std::filesystem::path& llm_model_path,
+        const std::string& llm_device,
+        const ov::AnyMap& llm_properties,
         const GenerationConfig& generation_config
     ) :
         m_generation_config{generation_config},
         m_inputs_embedder(inputs_embedder_impl) {
-        m_is_npu = device.find("NPU") != std::string::npos;
+        m_is_npu = llm_device.find("NPU") != std::string::npos;
 
-        auto properties_copy = properties;
-        auto language_model_path = models_path / "openvino_language_model.xml";
+        auto properties_copy = llm_properties;
+        auto language_model_path = llm_model_path / "openvino_language_model.xml";
         auto language_model = utils::singleton_core().read_model(language_model_path, {}, properties_copy);
         auto kv_pos = ov::genai::utils::get_kv_axes_pos(language_model);
 
         ov::CompiledModel compiled_language_model;
         if (m_is_npu) {
             utils::KVDesc kv_desc;
-            update_npu_properties(models_path, properties_copy);
+            update_npu_properties(llm_model_path, properties_copy);
             std::tie(compiled_language_model, kv_desc) = utils::compile_decoder_for_npu(language_model, properties_copy, kv_pos);
             m_max_prompt_len = kv_desc.max_prompt_len;
             m_max_kv_cache_size = kv_desc.max_prompt_len + kv_desc.min_response_len;
         } else {
-            compiled_language_model = utils::singleton_core().compile_model(language_model, device, properties_copy);
+            compiled_language_model = utils::singleton_core().compile_model(language_model, llm_device, properties_copy);
         }
         ov::genai::utils::print_compiled_model_properties(compiled_language_model, "VLM language model");
 
@@ -573,9 +573,9 @@ VLMPipeline::VLMPipeline(
 
 VLMPipeline::VLMPipeline(
     InputsEmbedder::Ptr inputs_embedder,
-    const std::filesystem::path& models_path,
-    const std::string& device,
-    const ov::AnyMap& properties,
+    const std::filesystem::path& llm_model_path,
+    const std::string& llm_device,
+    const ov::AnyMap& llm_properties,
     const GenerationConfig& generation_config
 ) {
     auto start_time = std::chrono::steady_clock::now();
@@ -585,7 +585,7 @@ VLMPipeline::VLMPipeline(
     OPENVINO_ASSERT(internal_impl != nullptr,
         "InputsEmbedder must be constructed with model_dir to be used with VLMPipeline");
     
-    m_pimpl = std::make_unique<VLMPipelineImpl>(internal_impl, models_path, device, properties, generation_config);
+    m_pimpl = std::make_unique<VLMPipelineImpl>(internal_impl, llm_model_path, llm_device, llm_properties, generation_config);
     
     auto stop_time = std::chrono::steady_clock::now();
     m_pimpl->set_load_time(std::chrono::duration_cast<std::chrono::milliseconds>(stop_time - start_time).count());

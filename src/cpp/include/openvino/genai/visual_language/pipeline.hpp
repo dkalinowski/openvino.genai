@@ -92,9 +92,9 @@ public:
     /// @param generation_config Optional generation configuration for the pipeline.
     VLMPipeline(
         InputsEmbedder::Ptr inputs_embedder,
-        const std::filesystem::path& models_path,
-        const std::string& device,
-        const ov::AnyMap& properties = {},
+        const std::filesystem::path& llm_model_path,
+        const std::string& llm_device,
+        const ov::AnyMap& llm_properties = {},
         const ov::genai::GenerationConfig& generation_config = {}
     );
 
