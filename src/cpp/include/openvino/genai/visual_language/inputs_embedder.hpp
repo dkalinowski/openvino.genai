@@ -92,8 +92,7 @@ private:
     /// @note This is only accessible by friend classes (e.g., VLMPipeline).
     std::shared_ptr<class InputsEmbedderImpl> get_internal_impl() const;
     
-    class InputsEmbedderImplWrapper;
-    std::unique_ptr<InputsEmbedderImplWrapper> m_pimpl;
+    std::shared_ptr<class InputsEmbedderImpl> m_impl;
 };
 
 } // namespace ov::genai

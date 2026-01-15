@@ -520,103 +520,41 @@ std::pair<std::string, std::vector<size_t>> InputsEmbedderImpl::IInputsEmbedder:
 
 // ======================== InputsEmbedder (public API) ========================
 
-/// @brief The implementation class that wraps the internal InputsEmbedderImpl for the public API.
-class InputsEmbedder::InputsEmbedderImplWrapper {
-public:
-    InputsEmbedderImplWrapper(
-        const std::filesystem::path& model_dir,
-        const std::string& device,
-        const ov::AnyMap& device_config)
-        : m_internal_impl(std::make_shared<ov::genai::InputsEmbedderImpl>(model_dir, device, device_config)),
-          m_model_dir(model_dir),
-          m_device(device),
-          m_device_config(device_config) {}
-
-    InputsEmbedderImplWrapper(
-        VisionEncoder::Ptr vision_encoder,
-        EmbeddingsModel::Ptr embeddings_model,
-        const std::filesystem::path& config_dir_path)
-        : m_config_dir_path(config_dir_path)
-    {
-        // Read the VLM config to get model type information
-        m_vlm_config = utils::from_config_json_if_exists<VLMConfig>(config_dir_path, "config.json");
-        
-        // Create internal impl using the pre-loaded components
-        // This allows the InputsEmbedder to work with VLMPipeline
-        m_internal_impl = std::make_shared<ov::genai::InputsEmbedderImpl>(
-            vision_encoder->get_internal_impl(),
-            embeddings_model->get_internal_impl(),
-            config_dir_path
-        );
-    }
-
-    std::vector<EncodedImage> encode_images(const std::vector<ov::Tensor>& images) {
-        // Use internal impl for encoding to ensure consistency
-        return m_internal_impl->encode_images(images);
-    }
-
-    ov::Tensor get_inputs_embeds(
-        const std::string& prompt,
-        const std::vector<EncodedImage>& encoded_images)
-    {
-        VLMPerfMetrics metrics;
-        return m_internal_impl->get_inputs_embeds(prompt, encoded_images, metrics, true, {});
-    }
-
-    Tokenizer get_tokenizer() const {
-        return m_internal_impl->get_tokenizer();
-    }
-
-    /// @brief Get the internal InputsEmbedderImpl for use by friend classes.
-    /// @note This is only accessible by friend classes (e.g., VLMPipeline).
-    std::shared_ptr<ov::genai::InputsEmbedderImpl> get_internal_impl() const {
-        return m_internal_impl;
-    }
-
-private:
-    std::shared_ptr<ov::genai::InputsEmbedderImpl> m_internal_impl;
-    
-    // Store construction parameters for later use
-    std::filesystem::path m_model_dir;
-    std::string m_device;
-    ov::AnyMap m_device_config;
-    
-    // For external components mode
-    std::filesystem::path m_config_dir_path;
-    VLMConfig m_vlm_config;
-};
-
 InputsEmbedder::InputsEmbedder(
     const std::filesystem::path& model_dir,
     const std::string& device,
     const ov::AnyMap& device_config)
-    : m_pimpl(std::make_unique<InputsEmbedderImplWrapper>(model_dir, device, device_config)) {}
+    : m_impl(std::make_shared<InputsEmbedderImpl>(model_dir, device, device_config)) {}
 
 InputsEmbedder::InputsEmbedder(
     VisionEncoder::Ptr vision_encoder,
     EmbeddingsModel::Ptr embeddings_model,
     const std::filesystem::path& config_dir_path)
-    : m_pimpl(std::make_unique<InputsEmbedderImplWrapper>(vision_encoder, embeddings_model, config_dir_path)) {}
+    : m_impl(std::make_shared<InputsEmbedderImpl>(
+        vision_encoder->get_internal_impl(),
+        embeddings_model->get_internal_impl(),
+        config_dir_path)) {}
 
 InputsEmbedder::~InputsEmbedder() = default;
 
 std::vector<EncodedImage> InputsEmbedder::encode_images(const std::vector<ov::Tensor>& images) {
-    return m_pimpl->encode_images(images);
+    return m_impl->encode_images(images);
 }
 
 ov::Tensor InputsEmbedder::get_inputs_embeds(
     const std::string& prompt,
     const std::vector<EncodedImage>& encoded_images)
 {
-    return m_pimpl->get_inputs_embeds(prompt, encoded_images);
+    VLMPerfMetrics metrics;
+    return m_impl->get_inputs_embeds(prompt, encoded_images, metrics, true, {});
 }
 
 Tokenizer InputsEmbedder::get_tokenizer() const {
-    return m_pimpl->get_tokenizer();
+    return m_impl->get_tokenizer();
 }
 
 std::shared_ptr<InputsEmbedderImpl> InputsEmbedder::get_internal_impl() const {
-    return m_pimpl->get_internal_impl();
+    return m_impl;
 }
 
 } // namespace ov::genai
