@@ -17,6 +17,7 @@
 
 namespace {
 
+// TODO: Do the same for VisionEncoder as well, public API should be able to handle concurrent usage of VisionEncoder
 std::unique_ptr<ov::genai::CircularBufferQueue<ov::genai::EmbeddingsRequest>> init(ov::CompiledModel& compiled) {
     auto embeddings_requests_queue = std::make_unique<ov::genai::CircularBufferQueue<ov::genai::EmbeddingsRequest>>(
         compiled.get_property(ov::optimal_number_of_infer_requests),
@@ -127,7 +128,7 @@ void EmbeddingsModelImpl::merge_postprocess(std::shared_ptr<ov::Model> model, fl
 
 // ======================== EmbeddingsModel (public API) ========================
 
-/// @brief The implementation class that wraps EmbeddingsModelImpl for the public API.
+/// @brief The implementation class that wraps EmbeddingsModelImpl for the public API. Allows for concurrent usage of the model.
 class EmbeddingsModel::EmbeddingsModelImplWrapper {
 public:
     EmbeddingsModelImplWrapper(

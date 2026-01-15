@@ -116,7 +116,7 @@ public:
     /// @brief Move assignment operator.
     VisionEncoder& operator=(VisionEncoder&& other) noexcept;
 
-    /// @brief Compute embeddings of an image.
+    /// @brief Compute embeddings of an image. DOESNT allow for concurrent usage.
     /// @param image An image to infer embeddings for. Image shape must be
     /// [1CHW] or [CHW]. Only batch 1 is supported.
     /// @param config_map A config or its members values to follow

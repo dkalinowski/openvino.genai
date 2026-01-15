@@ -19,6 +19,10 @@ struct SplitImageShape {
     size_t width;
 };
 
+//
+// *** Proof of concept for VisionEncoder on NPU ***
+//
+
 // Function to determine how to split the image based on its aspect ratio
 // Each VLM model class should have similar implementation in order to deduce static shape for Vision Encoder
 // Used during reshape in case Vision Encoder is on NPU device
