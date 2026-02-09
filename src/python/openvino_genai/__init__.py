@@ -41,7 +41,9 @@ __version__ = get_version()
 # VLM pipeline
 
 from .py_openvino_genai import (
+    VLMInputs,
     VLMPipeline,
+    VLMProcessor,
 )
 
 # LLM pipeline

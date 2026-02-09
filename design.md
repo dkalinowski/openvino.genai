@@ -22,7 +22,7 @@ output_ids = model.generate(**inputs)
 text = processor.batch_decode(output_ids)
 ```
 
-The key insight: the Processor produces a structured input; the model consumes it. The Processor can also be used standalone (e.g., get_image_features()).
+The main flow: the Processor produces a structured input; the model consumes it. The Processor can also be used standalone (e.g., get_image_features()).
 
 ## Proposed API (C++ Headers)
 ### 1. VLMInputs — The structured intermediate

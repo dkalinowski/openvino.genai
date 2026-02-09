@@ -16,9 +16,11 @@ GenerationHandle
 ContinuousBatchingPipeline::PromptLookupImpl::add_request(uint64_t request_id,
                                                           const ov::Tensor& input_ids,
                                                           const ov::genai::GenerationConfig& sampling_params,
-                                                          std::optional<ov::Tensor> token_type_ids) {
+                                                          std::optional<ov::Tensor> token_type_ids,
+                                                          std::optional<ov::Tensor> position_ids,
+                                                          std::optional<int64_t> rope_delta) {
     OPENVINO_ASSERT(sampling_params.is_prompt_lookup(), "`max_ngram_size` && `num_assistant_tokens` should be specified for `prompt lookup decoding`");
-    return m_pipeline->add_request(request_id, input_ids, sampling_params, token_type_ids);
+    return m_pipeline->add_request(request_id, input_ids, sampling_params, token_type_ids, position_ids, rope_delta);
 }
 
 GenerationHandle

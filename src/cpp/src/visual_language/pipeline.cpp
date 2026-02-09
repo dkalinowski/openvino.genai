@@ -497,6 +497,96 @@ public:
         m_generation_config.validate();
     }
 
+    VLMDecodedResults generate(
+        const VLMInputs& inputs,
+        GenerationConfig generation_config,
+        const StreamerVariant& streamer
+    ) override {
+        auto generate_start_time = std::chrono::steady_clock::now();
+        VLMPerfMetrics perf_metrics;
+
+        // For VLMInputs-based generation, always reset state (no chat history management)
+        m_language.reset_state();
+        m_language.get_tensor("attention_mask").set_shape({1, 0});
+
+        setup_generation_config(generation_config);
+
+        ov::Tensor inputs_embeds = inputs.inputs_embeds;
+        ov::Tensor attention_mask = inputs.attention_mask;
+        std::optional<ov::Tensor> token_type_ids = inputs.token_type_ids;
+
+        const size_t inputs_embeds_size = inputs_embeds.get_shape().at(1);
+
+        // Update perf metrics with num_input_tokens
+        perf_metrics.num_input_tokens = inputs_embeds_size;
+
+        utils::KVCacheState& kv_cache_state = m_inputs_embedder->get_kv_cache_state();
+        kv_cache_state.reset_state();
+
+        std::vector<SequenceGroup::Ptr> requests;
+        const size_t request_id = 0;
+        const size_t block_size = 1;
+
+        ov::Tensor prompt_ids(ov::element::i64, {inputs_embeds_size});
+        std::fill_n(prompt_ids.data<int64_t>(), prompt_ids.get_size(), m_tokenizer.get_pad_token_id());
+
+        SequenceGroup::Ptr sequence_group = std::make_shared<SequenceGroup>(
+            request_id, prompt_ids, generation_config, block_size);
+        requests.push_back(std::move(sequence_group));
+
+        std::shared_ptr<StreamerBase> streamer_ptr = utils::create_streamer(streamer, m_tokenizer);
+
+        OPENVINO_ASSERT(streamer_ptr == nullptr || generation_config.num_return_sequences == 1 &&
+            (generation_config.is_greedy_decoding() || generation_config.is_multinomial()),
+            "Currently streaming is possible only with batch size=1 and only for greedy or multinomial decoding");
+
+        ov::Tensor position_ids = inputs.position_ids.value_or(
+            ov::Tensor{ov::element::i64, {0}});
+
+        if (!inputs.position_ids.has_value()) {
+            position_ids = ov::Tensor{ov::element::i64, {1, inputs_embeds_size}};
+            std::iota(position_ids.data<int64_t>(),
+                      position_ids.data<int64_t>() + inputs_embeds_size, 0);
+        }
+
+        if (m_sampler.get_seed() != generation_config.rng_seed) {
+            m_sampler.set_seed(generation_config.rng_seed);
+        }
+
+        auto finish_info = ov::genai::get_lm_encoded_results(
+            m_language, inputs_embeds, attention_mask, streamer_ptr, m_sampler,
+            std::move(requests), position_ids, token_type_ids, kv_cache_state,
+            m_embedding, inputs.rope_delta);
+
+        EncodedResults& encoded_result = finish_info.results;
+
+        auto decode_start_time = std::chrono::steady_clock::now();
+        VLMDecodedResults decoded;
+        for (size_t idx = 0; idx < encoded_result.tokens.size(); ++idx) {
+            decoded.texts.push_back(m_tokenizer.decode(encoded_result.tokens.at(idx)));
+            decoded.scores.push_back(encoded_result.scores.at(idx));
+        }
+        auto decode_end_time = std::chrono::steady_clock::now();
+
+        kv_cache_state.reset_state();
+
+        auto generate_end_time = std::chrono::steady_clock::now();
+        decoded.perf_metrics = encoded_result.perf_metrics;
+
+        auto& res_raw_counters = decoded.perf_metrics.raw_metrics;
+        decoded.perf_metrics.num_input_tokens = perf_metrics.num_input_tokens;
+        decoded.perf_metrics.load_time = this->get_load_time();
+        res_raw_counters.generate_durations.emplace_back(
+            PerfMetrics::get_microsec(generate_end_time - generate_start_time));
+        res_raw_counters.detokenization_durations.emplace_back(
+            PerfMetrics::get_microsec(decode_end_time - decode_start_time));
+
+        decoded.perf_metrics.m_evaluated = false;
+        decoded.perf_metrics.evaluate_statistics(generate_start_time);
+
+        return decoded;
+    }
+
 private:
     void setup_generation_config(GenerationConfig& generation_config) {
         // If stop_token_ids were not provided, take value from default m_generation_config
@@ -710,6 +800,21 @@ VLMPipeline::VLMPipeline(
 }
 
 VLMPipeline::~VLMPipeline() = default;
+
+VLMDecodedResults VLMPipeline::generate(
+    const VLMInputs& inputs,
+    const GenerationConfig& generation_config,
+    const StreamerVariant& streamer
+) {
+    return m_pimpl->generate(inputs, generation_config, streamer);
+}
+
+VLMDecodedResults VLMPipeline::generate(
+    const VLMInputs& inputs,
+    const ov::AnyMap& config_map
+) {
+    return m_pimpl->generate(inputs, config_map);
+}
 
 VLMDecodedResults VLMPipeline::generate(
     const std::string& prompt,

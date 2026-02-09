@@ -263,7 +263,9 @@ ContinuousBatchingPipeline::ContinuousBatchingImpl::add_request(
     uint64_t request_id,
     const ov::Tensor& input_ids,
     const ov::genai::GenerationConfig& sampling_params,
-    std::optional<ov::Tensor> token_type_ids) {
+    std::optional<ov::Tensor> token_type_ids,
+    std::optional<ov::Tensor> position_ids_opt,
+    std::optional<int64_t> rope_delta_opt) {
     auto sampling_params_copy = sampling_params;
     // If stop_token_ids were not provided, take value from default m_generation_config
     if (sampling_params_copy.stop_token_ids.empty())
@@ -282,13 +284,20 @@ ContinuousBatchingPipeline::ContinuousBatchingImpl::add_request(
 
     std::shared_ptr<SequenceGroup> sequence_group;
     if (m_model_input_type == ModelInputType::EMBEDDINGS) {
-        const auto [position_ids, rope_delta] = m_inputs_embedder->get_position_ids(input_ids.get_shape()[1], 0);
+        ov::Tensor pos_ids;
+        std::optional<int64_t> rope_delta;
+        if (position_ids_opt.has_value()) {
+            pos_ids = position_ids_opt.value();
+            rope_delta = rope_delta_opt;
+        } else {
+            std::tie(pos_ids, rope_delta) = m_inputs_embedder->get_position_ids(input_ids.get_shape()[1], 0);
+        }
         sequence_group = std::make_shared<SequenceGroup>(request_id, 
                                                          input_ids, 
                                                          sampling_params_copy, 
                                                          m_block_size, 
                                                          token_type_ids, 
-                                                         position_ids, 
+                                                         pos_ids, 
                                                          rope_delta);
     }
     else {

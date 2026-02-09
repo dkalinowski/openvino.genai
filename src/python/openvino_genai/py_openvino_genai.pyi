@@ -596,6 +596,12 @@ class ContinuousBatchingPipeline:
     @typing.overload
     def add_request(self, request_id: typing.SupportsInt, prompt: str, images: collections.abc.Sequence[openvino._pyopenvino.Tensor], generation_config: GenerationConfig) -> GenerationHandle:
         ...
+    @typing.overload
+    def add_request(self, request_id: typing.SupportsInt, inputs: VLMInputs, generation_config: GenerationConfig) -> GenerationHandle:
+        """
+        Add a generation request using pre-processed VLMInputs from VLMProcessor.prepare().
+        """
+        ...
     def finish_chat(self) -> None:
         ...
     @typing.overload
@@ -3946,6 +3952,61 @@ class VLMDecodedResults(DecodedResults):
     @property
     def texts(self) -> list[str]:
         ...
+class VLMInputs:
+    """
+    Structured inputs for VLM generation, produced by VLMProcessor.prepare().
+    Contains merged text+vision embeddings, attention mask, and optional
+    model-specific tensors (position IDs, token type IDs).
+    """
+    inputs_embeds: openvino.Tensor
+    attention_mask: openvino.Tensor
+    position_ids: openvino.Tensor | None
+    token_type_ids: openvino.Tensor | None
+    rope_delta: int | None
+    def __init__(self) -> None:
+        ...
+    def has_vision_content(self) -> bool:
+        """Check whether vision content was encoded into these inputs."""
+        ...
+    def __repr__(self) -> str:
+        ...
+class VLMProcessor:
+    """
+    A processor for Visual Language Models that handles vision encoding,
+    text tokenization, embedding merging, and chat template application.
+    Produces VLMInputs for VLMPipeline.generate() or ContinuousBatchingPipeline.add_request().
+    """
+    def __init__(self, models_path: os.PathLike | str | bytes, device: str, **kwargs) -> None:
+        """
+        VLMProcessor constructor.
+        models_path (os.PathLike): Path to the folder with exported model files.
+        device (str): Device to run the model on (e.g., CPU, GPU).
+        kwargs: Device properties
+        """
+    def prepare(self, prompt: str, images: list[openvino.Tensor] = [], videos: list[openvino.Tensor] = []) -> VLMInputs:
+        """
+        Prepare inputs for VLM generation.
+        Encodes images/videos, tokenizes text, merges vision features
+        into text embedding sequence, and computes attention mask and position IDs.
+        """
+        ...
+    def apply_chat_template(self, prompt: str, system_message: str = "", add_generation_prompt: bool = True) -> str:
+        """Apply the model's chat template to a prompt string."""
+        ...
+    def get_vision_embeddings(self, images: list[openvino.Tensor]) -> list[openvino.Tensor]:
+        """Extract vision encoder embeddings without merging with text. Returns raw encoder outputs before projection/resampling."""
+        ...
+    def get_video_embeddings(self, videos: list[openvino.Tensor]) -> list[openvino.Tensor]:
+        """Extract projected video embeddings without merging with text."""
+        ...
+    def get_tokenizer(self) -> Tokenizer:
+        ...
+    def set_apply_chat_template(self, apply: bool) -> None:
+        """Enable or disable automatic chat template application in prepare()."""
+        ...
+    def set_chat_template(self, new_template: str) -> None:
+        """Override the default chat template with a custom one."""
+        ...
 class VLMPerfMetrics(PerfMetrics):
     """
     
@@ -4224,6 +4285,26 @@ class VLMPipeline:
             generation_config: GenerationConfig,
             streamer: Callable[[str], bool], ov.genai.StreamerBase - streamer either as a lambda with a boolean returning flag whether generation should be stopped
         
+            :return: return results in decoded form
+            :rtype: VLMDecodedResults
+        """
+    @typing.overload
+    def generate(self, inputs: VLMInputs, generation_config: GenerationConfig, streamer: collections.abc.Callable[[str], int | None] | openvino_genai.py_openvino_genai.StreamerBase | None = None, **kwargs) -> VLMDecodedResults:
+        """
+            Generates sequences for VLMs from pre-processed VLMInputs.
+
+            :param inputs: Pre-processed inputs from VLMProcessor.prepare()
+            :type inputs: VLMInputs
+
+            :param generation_config: generation_config
+            :type generation_config: GenerationConfig or a dict
+
+            :param streamer: streamer either as a lambda with a boolean returning flag whether generation should be stopped
+            :type : Callable[[str], bool], ov.genai.StreamerBase
+
+            :param kwargs: arbitrary keyword arguments with keys corresponding to GenerationConfig fields.
+            :type : dict
+
             :return: return results in decoded form
             :rtype: VLMDecodedResults
         """

@@ -4,6 +4,7 @@
 #pragma once
 
 #include "openvino/genai/continuous_batching_pipeline.hpp"
+#include "openvino/genai/visual_language/vlm_inputs.hpp"
 #include "visual_language/inputs_embedder.hpp"
 #include "visual_language/vision_registry.hpp"
 
@@ -83,7 +84,9 @@ public:
     virtual GenerationHandle add_request(uint64_t request_id,
                                          const ov::Tensor& input_ids,
                                          const GenerationConfig& sampling_params,
-                                         std::optional<ov::Tensor> token_type_ids = std::nullopt) = 0;
+                                         std::optional<ov::Tensor> token_type_ids = std::nullopt,
+                                         std::optional<ov::Tensor> position_ids = std::nullopt,
+                                         std::optional<int64_t> rope_delta = std::nullopt) = 0;
 
     /**
      * Adds request to running queue based on string input
@@ -110,6 +113,14 @@ public:
                                  const std::string& prompt,
                                  const std::vector<ov::Tensor>& images,
                                  const std::vector<ov::Tensor>& videos,
+                                 GenerationConfig sampling_params);
+
+    /**
+     * Adds request with pre-processed VLMInputs containing merged embeddings.
+     * Bypasses internal encoding — the embeddings are already computed by VLMProcessor.
+     */
+    GenerationHandle add_request(uint64_t request_id,
+                                 const VLMInputs& inputs,
                                  GenerationConfig sampling_params);
 
     /**
@@ -174,6 +185,14 @@ public:
                                                     const std::vector<std::vector<ov::Tensor>>& videos,
                                                     const std::vector<GenerationConfig>& sampling_params,
                                                     const StreamerVariant& streamer);
+
+    /**
+     * Performs generation from pre-processed VLMInputs.
+     */
+    virtual std::vector<VLMDecodedResults> generate(
+        const std::vector<VLMInputs>& inputs,
+        const std::vector<GenerationConfig>& sampling_params,
+        const StreamerVariant& streamer);
 
     /**
      * Starts chat with a given system prompt

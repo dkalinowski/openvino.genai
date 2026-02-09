@@ -10,6 +10,7 @@
 
 #include "openvino/genai/cache_eviction.hpp"
 #include "openvino/genai/continuous_batching_pipeline.hpp"
+#include "openvino/genai/visual_language/vlm_inputs.hpp"
 #include "openvino/genai/sparse_attention.hpp"
 #include "tokenizer/tokenizers_path.hpp"
 
@@ -423,6 +424,19 @@ void init_continuous_batching_pipeline(py::module_& m) {
         .def("add_request", py::overload_cast<uint64_t, const std::string&, const ov::genai::GenerationConfig&>(&ContinuousBatchingPipeline::add_request), py::arg("request_id"), py::arg("prompt"), py::arg("generation_config"))
         .def("add_request", py::overload_cast<uint64_t, const std::string&, const std::vector<ov::Tensor>&, const std::vector<ov::Tensor>&, const ov::genai::GenerationConfig&>(&ContinuousBatchingPipeline::add_request), py::arg("request_id"), py::arg("prompt"), py::arg("images"), py::arg("videos"), py::arg("generation_config"))
         .def("add_request", py::overload_cast<uint64_t, const std::string&, const std::vector<ov::Tensor>&, const ov::genai::GenerationConfig&>(&ContinuousBatchingPipeline::add_request), py::arg("request_id"), py::arg("prompt"), py::arg("images"), py::arg("generation_config"))
+        .def("add_request", py::overload_cast<uint64_t, const ov::genai::VLMInputs&, const ov::genai::GenerationConfig&>(&ContinuousBatchingPipeline::add_request), py::arg("request_id"), py::arg("inputs"), py::arg("generation_config"),
+            R"(
+                Add a VLM request with pre-processed VLMInputs from VLMProcessor.
+
+                :param request_id: Unique request identifier.
+                :type request_id: int
+                :param inputs: Pre-processed VLMInputs from VLMProcessor.prepare().
+                :type inputs: VLMInputs
+                :param generation_config: Generation configuration.
+                :type generation_config: GenerationConfig
+                :return: Handle to monitor and read generation results.
+                :rtype: GenerationHandle
+            )")
         .def("step", &ContinuousBatchingPipeline::step)
         .def("has_non_finished_requests", &ContinuousBatchingPipeline::has_non_finished_requests)
 

@@ -568,6 +568,86 @@ ContinuousBatchingPipeline::IContinuousBatchingPipeline::add_request(
     return add_request(request_id, inputs, std::move(sampling_params));
 }
 
+GenerationHandle
+ContinuousBatchingPipeline::IContinuousBatchingPipeline::add_request(
+    uint64_t request_id,
+    const VLMInputs& inputs,
+    GenerationConfig sampling_params) {
+    // VLMInputs provides pre-computed embeddings and optional position IDs.
+    return add_request(request_id,
+                       inputs.inputs_embeds,
+                       sampling_params,
+                       inputs.token_type_ids,
+                       inputs.position_ids,
+                       inputs.rope_delta);
+}
+
+std::vector<VLMDecodedResults>
+ContinuousBatchingPipeline::IContinuousBatchingPipeline::generate(
+    const std::vector<VLMInputs>& inputs,
+    const std::vector<GenerationConfig>& sampling_params,
+    const StreamerVariant& streamer) {
+
+    auto generate_start_time = std::chrono::steady_clock::now();
+    OPENVINO_ASSERT(inputs.size() == sampling_params.size(),
+        "Number of VLMInputs should be equal to the number of generation configs.");
+
+    // Extract pre-computed tensors from VLMInputs
+    std::vector<ov::Tensor> input_embeds_list;
+    std::vector<ov::Tensor> token_type_ids_list;
+    std::vector<std::pair<ov::Tensor, std::optional<int64_t>>> position_ids_list;
+    input_embeds_list.reserve(inputs.size());
+
+    for (size_t i = 0; i < inputs.size(); ++i) {
+        input_embeds_list.push_back(inputs[i].inputs_embeds);
+
+        if (inputs[i].token_type_ids.has_value()) {
+            token_type_ids_list.push_back(inputs[i].token_type_ids.value());
+        }
+
+        ov::Tensor pos_ids = inputs[i].position_ids.value_or(ov::Tensor{});
+        if (!pos_ids || pos_ids.get_size() == 0) {
+            // Generate default sequential position IDs
+            const size_t seq_len = inputs[i].inputs_embeds.get_shape().at(1);
+            pos_ids = ov::Tensor{ov::element::i64, {1, seq_len}};
+            std::iota(pos_ids.data<int64_t>(), pos_ids.data<int64_t>() + seq_len, 0);
+        }
+        position_ids_list.push_back({pos_ids, inputs[i].rope_delta});
+    }
+
+    std::optional<std::vector<ov::Tensor>> opt_token_type_ids =
+        token_type_ids_list.empty() ? std::nullopt : std::make_optional(token_type_ids_list);
+
+    std::vector<EncodedGenerationResult> encoded_results =
+        generate(input_embeds_list, sampling_params, streamer, opt_token_type_ids, position_ids_list);
+
+    std::vector<VLMDecodedResults> results;
+    results.reserve(encoded_results.size());
+
+    for (size_t i = 0; i < encoded_results.size(); ++i) {
+        const auto& result = encoded_results[i];
+        VLMDecodedResults gen_result;
+        // Copy the base PerfMetrics portion into VLMPerfMetrics
+        static_cast<PerfMetrics&>(gen_result.perf_metrics) = result.perf_metrics;
+
+        auto decode_start_time = std::chrono::steady_clock::now();
+        for (size_t idx = 0; idx < result.m_generation_ids.size(); ++idx) {
+            gen_result.texts.push_back(m_tokenizer.decode(result.m_generation_ids.at(idx)));
+            gen_result.scores.push_back(result.m_scores.at(idx));
+        }
+        auto decode_end_time = std::chrono::steady_clock::now();
+        gen_result.perf_metrics.raw_metrics.detokenization_durations.emplace_back(
+            PerfMetrics::get_microsec(decode_end_time - decode_start_time));
+
+        gen_result.perf_metrics.m_evaluated = false;
+        gen_result.perf_metrics.evaluate_statistics(generate_start_time);
+
+        results.emplace_back(std::move(gen_result));
+    }
+
+    return results;
+}
+
 void ContinuousBatchingPipeline::IContinuousBatchingPipeline::stream_tokens(
     const std::shared_ptr<ThreadedStreamerWrapper>& streamer_ptr,
     const GenerationHandle& handle

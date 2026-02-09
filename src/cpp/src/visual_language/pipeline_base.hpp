@@ -4,6 +4,7 @@
 #pragma once
 
 #include "openvino/genai/visual_language/pipeline.hpp"
+#include "openvino/genai/visual_language/vlm_inputs.hpp"
 #include "utils.hpp"
 
 using namespace ov::genai;
@@ -99,6 +100,20 @@ public:
         GenerationConfig generation_config,
         const StreamerVariant& streamer
     ) = 0;
+
+    virtual VLMDecodedResults generate(
+        const VLMInputs& inputs,
+        GenerationConfig generation_config,
+        const StreamerVariant& streamer
+    ) = 0;
+
+    VLMDecodedResults generate(
+        const VLMInputs& inputs,
+        const ov::AnyMap& config_map
+    ) {
+        GenerationConfig config = resolve_generation_config(config_map);
+        return generate(inputs, config, utils::get_streamer_from_map(config_map));
+    }
 
     VLMDecodedResults generate(
         const ChatHistory& history,

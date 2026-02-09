@@ -18,6 +18,7 @@
 #include "openvino/genai/streamer_base.hpp"
 #include "openvino/genai/visibility.hpp"
 #include "openvino/genai/visual_language/pipeline.hpp"
+#include "openvino/genai/visual_language/vlm_inputs.hpp"
 
 #include "openvino/genai/cache_eviction.hpp"
 
@@ -173,6 +174,14 @@ public:
     GenerationHandle add_request(uint64_t request_id, const std::string& prompt, const std::vector<ov::Tensor>& images, const std::vector<ov::Tensor>& videos, const ov::genai::GenerationConfig& sampling_params);
     GenerationHandle add_request(uint64_t request_id, const std::string& prompt, const std::vector<ov::Tensor>& images, const ov::genai::GenerationConfig& sampling_params);
 
+    /// @brief Add a VLM request with pre-processed inputs from VLMProcessor.
+    /// @param request_id Unique request identifier.
+    /// @param inputs Pre-processed VLMInputs containing merged embeddings,
+    ///        attention mask, and optional position IDs / token type IDs.
+    /// @param sampling_params Generation configuration.
+    /// @return Handle to monitor and read generation results.
+    GenerationHandle add_request(uint64_t request_id, const VLMInputs& inputs, const ov::genai::GenerationConfig& sampling_params);
+
     void step();
 
     bool has_non_finished_requests();
@@ -211,6 +220,16 @@ public:
         const std::vector<std::vector<ov::Tensor>>& videos,
         const std::vector<GenerationConfig>& sampling_params,
         const StreamerVariant& streamer=std::monostate{});
+
+    /// @brief Batch generate from pre-processed VLMInputs.
+    /// @param inputs Vector of VLMInputs, one per request.
+    /// @param sampling_params Generation config per request.
+    /// @param streamer Optional streamer.
+    /// @return Vector of VLMDecodedResults, one per request.
+    std::vector<VLMDecodedResults> generate(
+        const std::vector<VLMInputs>& inputs,
+        const std::vector<GenerationConfig>& sampling_params,
+        const StreamerVariant& streamer = std::monostate{});
 
     /**
     * @brief start chat with keeping history in kv cache.

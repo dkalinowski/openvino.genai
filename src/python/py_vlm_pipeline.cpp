@@ -12,6 +12,7 @@
 
 #include "openvino/genai/visual_language/pipeline.hpp"
 #include "openvino/genai/visual_language/perf_metrics.hpp"
+#include "openvino/genai/visual_language/vlm_inputs.hpp"
 #include "tokenizer/tokenizers_path.hpp"
 #include "py_utils.hpp"
 #include "bindings_utils.hpp"
@@ -231,6 +232,38 @@ void init_vlm_pipeline(py::module_& m) {
         .def("get_tokenizer", &ov::genai::VLMPipeline::get_tokenizer)
         .def("get_generation_config", &ov::genai::VLMPipeline::get_generation_config, py::return_value_policy::copy)
         .def("set_generation_config", &ov::genai::VLMPipeline::set_generation_config, py::arg("config"))
+        .def(
+            "generate",
+            [](ov::genai::VLMPipeline& pipe,
+                const ov::genai::VLMInputs& inputs,
+                const ov::genai::GenerationConfig& generation_config,
+                const pyutils::PyBindStreamerVariant& py_streamer,
+                const py::kwargs& kwargs
+            ) -> py::typing::Union<ov::genai::VLMDecodedResults> {
+                auto updated_config = pyutils::update_config_from_kwargs(generation_config, kwargs);
+                ov::genai::StreamerVariant streamer = pyutils::pystreamer_to_streamer(py_streamer);
+                ov::genai::VLMDecodedResults res;
+                {
+                    py::gil_scoped_release rel;
+                    res = pipe.generate(inputs, updated_config, streamer);
+                }
+                return py::cast(res);
+            },
+            py::arg("inputs"), "Pre-processed VLMInputs from VLMProcessor.prepare()",
+            py::arg("generation_config"), "generation_config",
+            py::arg("streamer") = std::monostate(), "streamer",
+            R"(
+                Generate text from pre-processed VLMInputs.
+
+                :param inputs: VLMInputs from VLMProcessor.prepare()
+                :type inputs: VLMInputs
+                :param generation_config: Generation configuration
+                :type generation_config: GenerationConfig
+                :param streamer: Optional streamer
+                :type streamer: Callable[[str], bool] or StreamerBase
+                :return: Generated text results
+                :rtype: VLMDecodedResults
+            )")
         .def(
             "generate",
             [](ov::genai::VLMPipeline& pipe,

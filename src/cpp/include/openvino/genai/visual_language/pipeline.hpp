@@ -11,6 +11,7 @@
 #include "openvino/genai/streamer_base.hpp"
 #include "openvino/genai/tokenizer.hpp"
 #include "openvino/genai/visual_language/perf_metrics.hpp"
+#include "openvino/genai/visual_language/vlm_inputs.hpp"
 
 namespace ov::genai {
 
@@ -85,6 +86,41 @@ public:
 
     /// @brief Default destructor.
     ~VLMPipeline();
+
+    // ---- New VLMInputs-based API (preferred) ----
+
+    /// @brief Generate text from pre-processed VLMInputs produced by VLMProcessor::prepare().
+    /// This is the preferred generate() overload for the new Processor + Pipeline pattern.
+    /// @param inputs Structured inputs from VLMProcessor::prepare(), containing
+    ///        merged text+vision embeddings, attention mask, and position IDs.
+    /// @param generation_config Text generation parameters.
+    /// @param streamer Optional streamer for token-by-token output.
+    /// @return VLMDecodedResults containing generated texts, scores, and perf metrics.
+    VLMDecodedResults generate(
+        const VLMInputs& inputs,
+        const GenerationConfig& generation_config,
+        const StreamerVariant& streamer = std::monostate{}
+    );
+
+    /// @brief Generate from VLMInputs with a config map (convenient for Python bindings).
+    /// @param inputs Structured inputs from VLMProcessor::prepare().
+    /// @param config_map Config containing GenerationConfig values, streamer, etc.
+    /// @return VLMDecodedResults containing generated texts, scores, and perf metrics.
+    VLMDecodedResults generate(
+        const VLMInputs& inputs,
+        const ov::AnyMap& config_map
+    );
+
+    /// @brief Generate from VLMInputs with variadic ov::Property arguments.
+    template <typename... Properties>
+    util::EnableIfAllStringAny<VLMDecodedResults, Properties...> generate(
+        const VLMInputs& inputs,
+        Properties&&... properties
+    ) {
+        return generate(inputs, AnyMap{std::forward<Properties>(properties)...});
+    }
+
+    // ---- Legacy prompt-based API (kept for backward compatibility) ----
 
     /// @brief Generate a response given a prompt and any number of
     /// uint8 RGB images with [NHWC] or [HWC] layout.

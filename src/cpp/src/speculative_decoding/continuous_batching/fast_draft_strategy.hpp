@@ -166,7 +166,9 @@ public:
     GenerationHandle add_request(uint64_t request_id,
                                  const ov::Tensor& input_ids,
                                  const ov::genai::GenerationConfig& sampling_params,
-                                 std::optional<ov::Tensor> token_type_ids = std::nullopt) override;
+                                 std::optional<ov::Tensor> token_type_ids = std::nullopt,
+                                 std::optional<ov::Tensor> position_ids = std::nullopt,
+                                 std::optional<int64_t> rope_delta = std::nullopt) override;
     GenerationHandle add_request(uint64_t request_id,
                                  const std::string& prompt,
                                  const ov::genai::GenerationConfig& sampling_params) override;
