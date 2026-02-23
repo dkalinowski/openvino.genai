@@ -130,6 +130,7 @@ ContinuousBatchingPipeline::PromptLookupImpl::generate(const std::vector<ov::Ten
 
     streamer_ptr->start();
 
+    bool prefill_end_notified = false;
     while (has_non_finished_requests()) {
         try {
             step();
@@ -137,6 +138,10 @@ ContinuousBatchingPipeline::PromptLookupImpl::generate(const std::vector<ov::Ten
             drop_requests(); // remove all requests from pipeline state in case of exception
             streamer_ptr->end();
             std::rethrow_exception(std::current_exception());
+        }
+        if (!prefill_end_notified && generation->can_read()) {
+            streamer_ptr->on_prefill_end();
+            prefill_end_notified = true;
         }
         stream_tokens(streamer_ptr, generation);
     }

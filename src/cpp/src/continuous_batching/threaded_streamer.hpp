@@ -43,6 +43,13 @@ public:
         m_squeue.push(token);
     }
 
+    void on_prefill_end() {
+        if (!m_streamer_ptr) {
+            return;
+        }
+        m_streamer_ptr->on_prefill_end();
+    }
+
     void end() {
         if (!m_streamer_ptr) {
             return;

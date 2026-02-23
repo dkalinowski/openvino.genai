@@ -36,6 +36,10 @@ void GenerationHandleImpl::cancel() {
     m_generation_stream->cancel();
 }
 
+bool GenerationHandleImpl::wait_for_prefill() {
+    return m_generation_stream->wait_for_prefill();
+}
+
 std::unordered_map<uint64_t, GenerationOutput> GenerationHandleImpl::read() {
     OPENVINO_ASSERT(!is_stopped() && !is_cancelled(), "GenerationHandle cannot be used after it is stopped / cancelled.");
     return m_generation_stream->read();

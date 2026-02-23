@@ -1205,6 +1205,11 @@ class GenerationHandle:
         ...
     def stop(self) -> None:
         ...
+    def wait_for_prefill(self) -> bool:
+        """
+        Blocks until prefill (prompt processing) is complete for this request.
+        Returns True when prefill finished normally, False if generation was cancelled/stopped before prefill completed.
+        """
 class GenerationOutput:
     finish_reason: GenerationFinishReason
     @property
@@ -2776,6 +2781,10 @@ class StreamerBase:
     def end(self) -> None:
         """
         End is called at the end of generation. It can be used to flush cache if your own streamer has one
+        """
+    def on_prefill_end(self) -> None:
+        """
+        Called when prefill (prompt processing) is complete and first output token is about to be generated. Override to measure time-to-first-token.
         """
     def write(self, token: typing.SupportsInt | collections.abc.Sequence[typing.SupportsInt]) -> StreamingStatus:
         """

@@ -178,6 +178,14 @@ ov::genai::utils::GenerationFinishInfo get_lm_encoded_results(
     raw_perf_counters.m_new_token_times.emplace_back(std::chrono::steady_clock::now());
     raw_perf_counters.m_batch_sizes.emplace_back(sampler_output.num_generated_tokens);
 
+    for (const auto& sequence_group : sequence_groups) {
+        sequence_group->get_generation_stream()->set_prefill_finished();
+    }
+
+    if (streamer_ptr) {
+        streamer_ptr->on_prefill_end();
+    }
+
     // "Generation" phase
 
     while (!active_sequence_groups.empty()) {

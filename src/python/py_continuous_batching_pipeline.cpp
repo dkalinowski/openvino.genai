@@ -269,6 +269,13 @@ void init_continuous_batching_pipeline(py::module_& m) {
         .def("can_read", &GenerationHandleImpl::can_read)
         .def("stop", &GenerationHandleImpl::stop)
         .def("cancel", &GenerationHandleImpl::cancel)
+        .def("wait_for_prefill",
+            [](GenerationHandleImpl& self) {
+                py::gil_scoped_release rel;
+                return self.wait_for_prefill();
+            },
+            "Blocks until prefill (prompt processing) is complete for this request. "
+            "Returns True when prefill finished normally, False if generation was cancelled/stopped before prefill completed.")
         .def("read", &GenerationHandleImpl::read)
         .def("read_all", &GenerationHandleImpl::read_all);
 

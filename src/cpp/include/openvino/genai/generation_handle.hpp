@@ -111,6 +111,10 @@ public:
 
     void cancel();
 
+    /// @brief Blocks until prefill (prompt processing) is complete for this request.
+    /// @return true when prefill finished normally, false if generation was cancelled/stopped before prefill completed.
+    bool wait_for_prefill();
+
     // Reads result of a generation for single iteration
     GenerationOutputs read();
     // Reads all generated tokens for all sequences

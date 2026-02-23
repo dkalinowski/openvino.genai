@@ -63,6 +63,9 @@ class ConstructableStreamer: public StreamerBase {
             token  // Argument(s)
         );
     }
+    void on_prefill_end() override {
+        PYBIND11_OVERRIDE(void, StreamerBase, on_prefill_end);
+    }
     void end() override {
         PYBIND11_OVERRIDE_PURE(void, StreamerBase, end);
     }
@@ -109,7 +112,8 @@ void init_streamers(py::module_& m) {
             },
             "Write is called every time new token or vector of tokens is decoded. Returns a StreamingStatus flag to indicate whether generation should be stopped or cancelled",
             py::arg("token"))
-        .def("end", &StreamerBase::end, "End is called at the end of generation. It can be used to flush cache if your own streamer has one");
+        .def("end", &StreamerBase::end, "End is called at the end of generation. It can be used to flush cache if your own streamer has one")
+        .def("on_prefill_end", &StreamerBase::on_prefill_end, "Called when prefill (prompt processing) is complete and first output token is about to be generated. Override to measure time-to-first-token.");
 
     py::class_<TextStreamer, std::shared_ptr<TextStreamer>, StreamerBase>(m, "TextStreamer", text_streamer_docstring)
         .def(py::init([](const Tokenizer& tokenizer, std::function<CallbackTypeVariant(std::string)> callback, const std::map<std::string, py::object>& detokenization_params) {

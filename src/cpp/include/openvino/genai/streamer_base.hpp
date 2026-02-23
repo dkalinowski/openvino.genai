@@ -37,6 +37,10 @@ public:
         return StreamingStatus::RUNNING;
     };
 
+    /// @brief Called when prefill (prompt processing) is complete and first output token is about to be generated.
+    /// Override to receive notification at this boundary, e.g. to measure time-to-first-token.
+    virtual void on_prefill_end() {}
+
     /// @brief end is called at the end of generation. It can be used to flush cache if your own streamer has one
     virtual void end() = 0;
 

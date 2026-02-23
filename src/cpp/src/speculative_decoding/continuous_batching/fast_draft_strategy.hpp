@@ -75,6 +75,7 @@ std::vector<EncodedGenerationResult> generate_common(
     GenerationHandle& generation = main_generations.at(0);
 
     streamer_ptr->start();
+    bool prefill_end_notified = false;
     while (self->has_non_finished_requests()) {
         try {
             self->step();
@@ -82,6 +83,10 @@ std::vector<EncodedGenerationResult> generate_common(
             self->drop_requests();
             streamer_ptr->end();
             std::rethrow_exception(std::current_exception());
+        }
+        if (!prefill_end_notified && generation->can_read()) {
+            streamer_ptr->on_prefill_end();
+            prefill_end_notified = true;
         }
         self->stream_tokens(streamer_ptr, generation);
     }

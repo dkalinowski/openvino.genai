@@ -523,6 +523,7 @@ ContinuousBatchingPipeline::ContinuousBatchingImpl::generate(const std::vector<o
 
     streamer_ptr->start();
     m_sampler->clear_structured_output_compile_times();
+    bool prefill_end_notified = false;
     while (has_non_finished_requests()) {
         try {
             const auto infer_start = std::chrono::steady_clock::now();
@@ -532,6 +533,10 @@ ContinuousBatchingPipeline::ContinuousBatchingImpl::generate(const std::vector<o
             // but still inference took place, so we need to add this time to the total inference duration.
             raw_perf_counters.m_inference_durations[0] += MicroSeconds(m_pipeline_metrics.inference_duration);
             if (m_batch_size > 0) {
+                if (!prefill_end_notified) {
+                    streamer_ptr->on_prefill_end();
+                    prefill_end_notified = true;
+                }
                 const auto infer_end = std::chrono::steady_clock::now();
                 const auto infer_ms = PerfMetrics::get_microsec(infer_end - infer_start);
                 raw_perf_counters.m_token_infer_durations.emplace_back(infer_ms);
