@@ -14,6 +14,9 @@
 
 namespace ov::genai {
 
+struct Embeddings;
+class VLMProcessor;
+
 class OPENVINO_GENAI_EXPORTS VLMDecodedResults : public DecodedResults{
 public:
     VLMPerfMetrics perf_metrics;
@@ -51,6 +54,21 @@ public:
         const std::string& device,
         const ov::AnyMap& properties = {},
         const ov::genai::GenerationConfig& generation_config = {}
+    );
+
+    /// @brief Construct an LLM-only VLM pipeline that reuses a
+    /// pre-initialized VLMProcessor for vision encoding, tokenization,
+    /// and text embeddings.
+    /// @param models_path Directory with the exported language model.
+    /// @param processor A VLMProcessor whose internal state will be
+    ///        shared with this pipeline.
+    /// @param device Inference device for the language model.
+    /// @param properties Device configuration properties for the language model.
+    VLMPipeline(
+        const std::filesystem::path& models_path,
+        const VLMProcessor& processor,
+        const std::string& device,
+        const ov::AnyMap& properties = {}
     );
 
     /// @brief Construct a pipeline from a folder containing tokenizer
@@ -256,6 +274,19 @@ public:
             history, AnyMap{std::forward<Properties>(properties)...}
         );
     }
+
+    /// @brief Generate a response from pre-computed Embeddings produced
+    /// by VLMProcessor::embed().
+    /// @param inputs Structured embeddings (merged text + vision features).
+    /// @param generation_config A config to follow for text generation.
+    /// @param streamer A streamer to acquire intermediate result.
+    /// @return VLMDecodedResults structure containing generated texts,
+    ///         scores and perf metrics.
+    VLMDecodedResults generate(
+        const Embeddings& inputs,
+        const GenerationConfig& generation_config,
+        const StreamerVariant& streamer = std::monostate{}
+    );
 
     /// @brief Activate chat mode. Chat preserves previous history.
     /// Calling start_chat() again or finish_chat() drops the memorized history.

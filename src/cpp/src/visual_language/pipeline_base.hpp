@@ -4,6 +4,7 @@
 #pragma once
 
 #include "openvino/genai/visual_language/pipeline.hpp"
+#include "openvino/genai/visual_language/processor.hpp"
 #include "utils.hpp"
 
 using namespace ov::genai;
@@ -107,6 +108,14 @@ public:
         auto [images_vector, videos_vector] = extract_images_and_videos_from_config_map(config_map);
         GenerationConfig config = resolve_generation_config(config_map);
         return generate(history, images_vector, videos_vector, config, utils::get_streamer_from_map(config_map));
+    }
+
+    virtual VLMDecodedResults generate(
+        const Embeddings& inputs,
+        const GenerationConfig& generation_config,
+        const StreamerVariant& streamer
+    ) {
+        OPENVINO_THROW("generate(Embeddings, ...) is not supported by this pipeline backend");
     }
 
     virtual void start_chat(const std::string& system_message) = 0;

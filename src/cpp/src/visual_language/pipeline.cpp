@@ -5,6 +5,7 @@
 #include <random>
 
 #include "openvino/genai/visual_language/pipeline.hpp"
+#include "openvino/genai/visual_language/processor.hpp"
 #include "openvino/genai/visual_language/perf_metrics.hpp"
 #include "openvino/genai/tokenizer.hpp"
 #include "openvino/genai/text_streamer.hpp"
@@ -13,6 +14,7 @@
 
 #include "visual_language/vlm_config.hpp"
 #include "visual_language/inputs_embedder.hpp"
+#include "visual_language/processor_impl.hpp"
 #include "visual_language/embedding_model.hpp"
 #include "visual_language/pipeline_base.hpp"
 #include "visual_language/continuous_batching_adapter.hpp"
@@ -130,7 +132,8 @@ private:
         const std::shared_ptr<ov::Model>& language_model,
         const std::filesystem::path& models_dir,
         const std::string& device,
-        const ov::AnyMap& properties
+        const ov::AnyMap& properties,
+        std::shared_ptr<InputsEmbedder> shared_inputs_embedder = nullptr
     ) {
         m_is_npu = device.find("NPU") != std::string::npos;
 
@@ -184,7 +187,11 @@ private:
             ? properties_copy
             : utils::pop_or_default<ov::AnyMap>(device_properties, embedder_device, {});
 
-        m_inputs_embedder = std::make_shared<InputsEmbedder>(models_dir, embedder_device, embedder_properties);
+        if (shared_inputs_embedder) {
+            m_inputs_embedder = shared_inputs_embedder;
+        } else {
+            m_inputs_embedder = std::make_shared<InputsEmbedder>(models_dir, embedder_device, embedder_properties);
+        }
         // NPU does not support history, so use full chat history on each chat iteration.
         m_use_full_chat_history = m_is_npu;
         finalize_initialization(language_model, kv_pos);
@@ -288,6 +295,23 @@ public:
     ) :
         m_generation_config{generation_config} {
         initialize_from_model_and_map(language_model, models_map, tokenizer, config_dir_path, device, properties);
+    }
+
+    // Construct a pipeline that reuses a pre-initialized InputsEmbedder
+    // (typically owned by a VLMProcessor).
+    VLMPipelineImpl(
+        const std::shared_ptr<ov::Model>& language_model,
+        const std::filesystem::path& models_dir,
+        std::shared_ptr<InputsEmbedder> shared_inputs_embedder,
+        const std::string& device,
+        const ov::AnyMap& properties
+    ) :
+        m_generation_config{
+            utils::from_config_json_if_exists<GenerationConfig>(
+                models_dir, "generation_config.json"
+            )
+        } {
+        initialize_from_model_and_dir(language_model, models_dir, device, properties, std::move(shared_inputs_embedder));
     }
 
     VLMDecodedResults generate(
@@ -614,7 +638,104 @@ public:
         if (m_generation_config.eos_token_id == -1)
             m_generation_config.set_eos_token_id(default_eos_token_id);
 
-        m_generation_config.validate();
+        m_generation_config.validate();    }
+
+    // Run the language model on pre-computed Embeddings produced by VLMProcessor.
+    // Reuses the shared InputsEmbedder for cache state, position ids and
+    // LM extra inputs. Chat mode and NPU are not supported on this path yet.
+    VLMDecodedResults generate(
+        const Embeddings& inputs,
+        const GenerationConfig& generation_config,
+        const StreamerVariant& streamer
+    ) override {
+        OPENVINO_ASSERT(!m_is_chat_conversation,
+            "generate(Embeddings, ...) is not supported in chat mode");
+        OPENVINO_ASSERT(!m_is_npu,
+            "generate(Embeddings, ...) is not supported on NPU device");
+        OPENVINO_ASSERT(inputs.inputs_embeds,
+            "Embeddings.inputs_embeds must be initialized by VLMProcessor::embed()");
+
+        auto generate_start_time = std::chrono::steady_clock::now();
+        VLMPerfMetrics perf_metrics;
+        auto& raw_counters = perf_metrics.raw_metrics;
+
+        reset_language_state();
+        m_language.get_tensor("attention_mask").set_shape({1, 0});
+
+        GenerationConfig config = generation_config;
+        setup_generation_config(config);
+
+        const ov::Tensor& inputs_embeds = inputs.inputs_embeds;
+        const size_t inputs_embeds_size = inputs_embeds.get_shape().at(1);
+
+        utils::CacheState& cache_state = m_inputs_embedder->get_cache_state();
+        cache_state.reset_state();
+
+        if (m_adapter_controller) {
+            m_adapter_controller->apply(m_language, config.adapters);
+        }
+
+        const size_t history_size = 0;
+        ov::Tensor prompt_ids(ov::element::i64, {inputs_embeds_size});
+        std::fill_n(prompt_ids.data<int64_t>(), prompt_ids.get_size(), m_tokenizer.get_pad_token_id());
+        perf_metrics.num_input_tokens = prompt_ids.get_size();
+
+        const size_t request_id = 0;
+        const size_t block_size = 1;
+        std::vector<SequenceGroup::Ptr> requests;
+        requests.push_back(std::make_shared<SequenceGroup>(request_id, prompt_ids, config, block_size));
+
+        std::shared_ptr<StreamerBase> streamer_ptr = utils::create_streamer(streamer, m_tokenizer);
+        OPENVINO_ASSERT(streamer_ptr == nullptr || (config.num_return_sequences == 1 &&
+            (config.is_greedy_decoding() || config.is_multinomial())),
+            "Streaming requires batch size 1 with greedy or multinomial decoding");
+
+        ov::Tensor new_atten_mask{ov::element::i64, {1, inputs_embeds_size}};
+        std::fill_n(new_atten_mask.data<int64_t>(), new_atten_mask.get_size(), 1);
+
+        ov::Tensor position_ids;
+        std::optional<int64_t> rope_delta;
+        std::tie(position_ids, rope_delta) = m_inputs_embedder->get_position_ids(inputs_embeds_size, history_size);
+
+        const auto& lm_extra_inputs = m_inputs_embedder->get_lm_extra_inputs();
+
+        if (m_sampler.get_seed() != config.rng_seed) {
+            m_sampler.set_seed(config.rng_seed);
+        }
+
+        std::optional<ov::Tensor> token_type_ids;
+        auto finish_info = ov::genai::get_lm_encoded_results(
+            m_language, inputs_embeds, new_atten_mask, streamer_ptr, m_sampler, std::move(requests),
+            position_ids, token_type_ids, cache_state, m_embedding, rope_delta, m_max_kv_cache_size,
+            /*use_intermediate_remote_tensor=*/true, lm_extra_inputs
+        );
+
+        EncodedResults& encoded_result = finish_info.results;
+        auto decode_start_time = std::chrono::steady_clock::now();
+        VLMDecodedResults decoded;
+        for (size_t idx = 0; idx < encoded_result.tokens.size(); ++idx) {
+            decoded.texts.push_back(m_tokenizer.decode(encoded_result.tokens.at(idx)));
+            decoded.scores.push_back(encoded_result.scores.at(idx));
+        }
+        auto decode_end_time = std::chrono::steady_clock::now();
+
+        cache_state.reset_state();
+
+        auto generate_end_time = std::chrono::steady_clock::now();
+        decoded.perf_metrics = encoded_result.perf_metrics;
+
+        auto& res_raw_counters = decoded.perf_metrics.raw_metrics;
+        decoded.perf_metrics.num_input_tokens = perf_metrics.num_input_tokens;
+        decoded.perf_metrics.load_time = this->get_load_time();
+        res_raw_counters.generate_durations.emplace_back(PerfMetrics::get_microsec(generate_end_time - generate_start_time));
+        res_raw_counters.detokenization_durations.emplace_back(PerfMetrics::get_microsec(decode_end_time - decode_start_time));
+        res_raw_counters.tokenization_durations.insert(res_raw_counters.tokenization_durations.end(),
+                                                       raw_counters.tokenization_durations.begin(),
+                                                       raw_counters.tokenization_durations.end());
+
+        decoded.perf_metrics.m_evaluated = false;
+        decoded.perf_metrics.evaluate_statistics(generate_start_time);
+        return decoded;
     }
 
 private:
@@ -863,6 +984,44 @@ VLMPipeline::VLMPipeline(
 }
 
 VLMPipeline::~VLMPipeline() = default;
+
+VLMPipeline::VLMPipeline(
+    const std::filesystem::path& models_path,
+    const VLMProcessor& processor,
+    const std::string& device,
+    const ov::AnyMap& user_properties
+) {
+    auto start_time = std::chrono::steady_clock::now();
+
+    OPENVINO_ASSERT(device.find("NPU") == std::string::npos,
+        "VLMPipeline construction from VLMProcessor is not supported on NPU device yet");
+
+    auto [properties, attention_backend] = utils::extract_attention_backend(user_properties);
+    utils::clear_false_prompt_lookup_from_config(properties);
+    utils::extract_extensions_to_core(properties);
+
+    auto language_model_path = models_path / "openvino_language_model.xml";
+    auto language_model = utils::singleton_core().read_model(language_model_path, {}, properties);
+
+    m_pimpl = std::make_unique<VLMPipelineImpl>(
+        language_model,
+        models_path,
+        processor.m_impl->inputs_embedder,
+        device,
+        properties
+    );
+
+    auto stop_time = std::chrono::steady_clock::now();
+    m_pimpl->set_load_time(std::chrono::duration_cast<std::chrono::milliseconds>(stop_time - start_time).count());
+}
+
+VLMDecodedResults VLMPipeline::generate(
+    const Embeddings& inputs,
+    const GenerationConfig& generation_config,
+    const StreamerVariant& streamer
+) {
+    return m_pimpl->generate(inputs, generation_config, streamer);
+}
 
 VLMDecodedResults VLMPipeline::generate(
     const std::string& prompt,

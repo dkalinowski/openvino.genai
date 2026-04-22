@@ -12,6 +12,7 @@
 
 #include "openvino/genai/visual_language/pipeline.hpp"
 #include "openvino/genai/visual_language/perf_metrics.hpp"
+#include "openvino/genai/visual_language/processor.hpp"
 #include "tokenizer/tokenizers_path.hpp"
 #include "py_utils.hpp"
 #include "bindings_utils.hpp"
@@ -164,6 +165,59 @@ void init_vlm_pipeline(py::module_& m) {
         .def("get_prepare_embeddings_duration", &ov::genai::VLMPerfMetrics::get_prepare_embeddings_duration)
         .def_readonly("vlm_raw_metrics", &ov::genai::VLMPerfMetrics::vlm_raw_metrics);
 
+    py::class_<ov::genai::Embeddings>(m, "Embeddings", R"(
+        Structured inputs for VLM generation produced by VLMProcessor.embed().
+        Holds merged text and vision embeddings ready to be passed to VLMPipeline.generate().
+    )")
+        .def(py::init<>())
+        .def_readwrite("inputs_embeds", &ov::genai::Embeddings::inputs_embeds);
+
+    py::class_<ov::genai::VLMProcessor>(m, "VLMProcessor", R"(
+        Processor for Visual Language Models that performs vision encoding,
+        text tokenization and embedding merging. Its output (Embeddings) can
+        be consumed by a VLMPipeline.
+    )")
+        .def(py::init([](
+            const std::filesystem::path& models_path,
+            const std::string& device,
+            const py::kwargs& kwargs
+        ) {
+            ScopedVar env_manager(pyutils::ov_tokenizers_module_path());
+            ov::AnyMap properties = pyutils::kwargs_to_any_map(kwargs);
+            py::gil_scoped_release rel;
+            return std::make_unique<ov::genai::VLMProcessor>(models_path, device, properties);
+        }),
+        py::arg("models_path"), "folder with exported model files",
+        py::arg("device"), "device on which vision encoder and embeddings model are run",
+        R"(
+            VLMProcessor class constructor.
+            models_path (os.PathLike): Path to the folder with exported model files.
+            device (str): Device to run the vision/embedding models on (e.g., CPU, GPU).
+            kwargs: Device properties.
+        )")
+        .def(
+            "embed",
+            [](ov::genai::VLMProcessor& processor,
+               const std::string& prompt,
+               const std::vector<ov::Tensor>& images,
+               const std::vector<ov::Tensor>& videos) {
+                ov::genai::Embeddings res;
+                {
+                    py::gil_scoped_release rel;
+                    res = processor.embed(prompt, images, videos);
+                }
+                return res;
+            },
+            py::arg("prompt"), "Pre-formatted text prompt",
+            py::arg("images") = std::vector<ov::Tensor>{}, "Optional list of RGB image tensors",
+            py::arg("videos") = std::vector<ov::Tensor>{}, "Optional list of video tensors",
+            R"(
+                Encode vision inputs, tokenize the prompt, and merge into a single
+                Embeddings object ready for VLMPipeline.generate().
+            )"
+        )
+        .def("get_tokenizer", &ov::genai::VLMProcessor::get_tokenizer);
+
     py::class_<ov::genai::VLMDecodedResults, ov::genai::DecodedResults>(m, "VLMDecodedResults", decoded_results_docstring)
         .def(py::init<>())
         .def_property_readonly("texts", [](const ov::genai::VLMDecodedResults &dr) -> py::typing::List<py::str> { return pyutils::handle_utf8(dr.texts); })
@@ -229,6 +283,50 @@ void init_vlm_pipeline(py::module_& m) {
             generation_config (GenerationConfig | None): Device properties.
             kwargs: Device properties
         )")
+
+        .def(py::init([](
+            const std::filesystem::path& models_path,
+            const ov::genai::VLMProcessor& processor,
+            const std::string& device,
+            const py::kwargs& kwargs
+        ) {
+            ScopedVar env_manager(pyutils::ov_tokenizers_module_path());
+            ov::AnyMap properties = pyutils::kwargs_to_any_map(kwargs);
+            py::gil_scoped_release rel;
+            return std::make_unique<ov::genai::VLMPipeline>(models_path, processor, device, properties);
+        }),
+        py::arg("models_path"), "folder with exported language model",
+        py::arg("processor"), "pre-initialized VLMProcessor",
+        py::arg("device"), "device on which language model inference will be done",
+        R"(
+            VLMPipeline constructor that reuses a pre-initialized VLMProcessor.
+            models_path (os.PathLike): Path to the folder with the exported language model.
+            processor (VLMProcessor): Processor whose internal state is shared with the pipeline.
+            device (str): Device to run the language model on.
+            kwargs: Device properties.
+        )")
+
+        .def(
+            "generate",
+            [](ov::genai::VLMPipeline& pipe,
+               const ov::genai::Embeddings& inputs,
+               const ov::genai::GenerationConfig& generation_config,
+               const pyutils::PyBindStreamerVariant& py_streamer) {
+                ov::genai::StreamerVariant streamer = pyutils::pystreamer_to_streamer(py_streamer);
+                ov::genai::VLMDecodedResults res;
+                {
+                    py::gil_scoped_release rel;
+                    res = pipe.generate(inputs, generation_config, streamer);
+                }
+                return res;
+            },
+            py::arg("inputs"), "Pre-computed Embeddings produced by VLMProcessor.embed()",
+            py::arg("generation_config"), "generation config",
+            py::arg("streamer") = std::monostate(), "streamer",
+            R"(
+                Generate a response from pre-computed Embeddings.
+            )"
+        )
 
         .def("start_chat", &ov::genai::VLMPipeline::start_chat, py::arg("system_message") = "")
         .def("finish_chat", &ov::genai::VLMPipeline::finish_chat)
