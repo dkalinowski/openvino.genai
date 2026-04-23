@@ -16,36 +16,41 @@
 namespace {
 
 /**
- * Set position ids tensor data for next token inference based on provided attention mask
- * Supports multi batch
- * Supports sparse attention_mask
+ * Build the position_ids tensor for the next-token (decode) step from the
+ * current attention mask. A fresh tensor is allocated so the caller can set
+ * it on the infer request without mutating the prompt-step position_ids
+ * that it shares with its provider (e.g. Embeddings returned by
+ * VLMProcessor::embed()).
+ * Supports multi batch and sparse attention_mask.
  */
-void update_position_ids(ov::Tensor&& position_ids, const ov::Tensor&& attention_mask) {
+ov::Tensor make_next_position_ids(const ov::Tensor& attention_mask) {
     const size_t batch_size = attention_mask.get_shape().at(0);
     const size_t sequence_length = attention_mask.get_shape().at(1);
-    position_ids.set_shape({batch_size, 1});
+    ov::Tensor position_ids{ov::element::i64, {batch_size, 1}};
 
     for (size_t batch = 0; batch < batch_size; batch++) {
-        auto mask_start = attention_mask.data<int64_t>() + batch * sequence_length;
-        position_ids.data<int64_t>()[batch] = std::accumulate(mask_start, mask_start + sequence_length - 1, 0);
+        const int64_t* mask_start = attention_mask.data<int64_t>() + batch * sequence_length;
+        position_ids.data<int64_t>()[batch] = std::accumulate(mask_start, mask_start + sequence_length - 1, int64_t{0});
     }
+    return position_ids;
 }
 
-void update_3d_position_ids(ov::Tensor&& position_ids, const ov::Tensor& attention_mask, const int64_t rope_delta) {
+ov::Tensor make_next_3d_position_ids(const ov::Tensor& attention_mask, const int64_t rope_delta) {
     const size_t batch_size = attention_mask.get_shape().at(0);
     const size_t sequence_length = attention_mask.get_shape().at(1);
-    const size_t thw_dim_size = 3;
+    constexpr size_t thw_dim_size = 3;
 
-    position_ids.set_shape({thw_dim_size, batch_size, 1});
+    ov::Tensor position_ids{ov::element::i64, {thw_dim_size, batch_size, 1}};
     int64_t* position_ids_data = position_ids.data<int64_t>();
 
-    int64_t pos_id = static_cast<int64_t>(sequence_length) - 1 + rope_delta;
+    const int64_t pos_id = static_cast<int64_t>(sequence_length) - 1 + rope_delta;
 
     for (size_t batch = 0; batch < batch_size; batch++) {
         for (size_t dim = 0; dim < thw_dim_size; ++dim) {
             position_ids_data[dim * batch_size + batch] = pos_id;
         }
     }
+    return position_ids;
 }
 
 void update_attention_mask_with_beams(ov::Tensor&& attention_mask, std::vector<int32_t> next_beams) {
@@ -272,11 +277,10 @@ ov::genai::utils::GenerationFinishInfo get_lm_encoded_results(
         update_attention_mask_with_beams(m_llm.get_tensor("attention_mask"), next_beams);
 
         if (position_ids.has_value()) {
-            if (position_ids->get_shape().size() == 3 && rope_delta.has_value()) {
-                update_3d_position_ids(m_llm.get_tensor("position_ids"), m_llm.get_tensor("attention_mask"), rope_delta.value());
-            } else {
-                update_position_ids(m_llm.get_tensor("position_ids"), m_llm.get_tensor("attention_mask"));
-            }
+            ov::Tensor next_position_ids = (position_ids->get_shape().size() == 3 && rope_delta.has_value())
+                ? make_next_3d_position_ids(m_llm.get_tensor("attention_mask"), rope_delta.value())
+                : make_next_position_ids(m_llm.get_tensor("attention_mask"));
+            m_llm.set_tensor("position_ids", next_position_ids);
         }
 
         m_llm.set_tensor("beam_idx", ov::Tensor{ov::element::i32, {total_num_tokens}, next_beams.data()});

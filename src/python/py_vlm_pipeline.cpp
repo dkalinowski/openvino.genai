@@ -170,7 +170,8 @@ void init_vlm_pipeline(py::module_& m) {
         Holds merged text and vision embeddings ready to be passed to VLMPipeline.generate().
     )")
         .def(py::init<>())
-        .def_readwrite("inputs_embeds", &ov::genai::Embeddings::inputs_embeds);
+        .def_readwrite("inputs_embeds", &ov::genai::Embeddings::inputs_embeds)
+        .def_readwrite("prompt_ids", &ov::genai::Embeddings::prompt_ids);
 
     py::class_<ov::genai::VLMProcessor>(m, "VLMProcessor", R"(
         Processor for Visual Language Models that performs vision encoding,
@@ -214,6 +215,29 @@ void init_vlm_pipeline(py::module_& m) {
             R"(
                 Encode vision inputs, tokenize the prompt, and merge into a single
                 Embeddings object ready for VLMPipeline.generate().
+            )"
+        )
+        .def(
+            "embed",
+            [](ov::genai::VLMProcessor& processor,
+               const ov::genai::ChatHistory& history,
+               const std::vector<ov::Tensor>& images,
+               const std::vector<ov::Tensor>& videos) {
+                ov::genai::Embeddings res;
+                {
+                    py::gil_scoped_release rel;
+                    res = processor.embed(history, images, videos);
+                }
+                return res;
+            },
+            py::arg("history"), "Chat history",
+            py::arg("images") = std::vector<ov::Tensor>{}, "Optional list of RGB image tensors",
+            py::arg("videos") = std::vector<ov::Tensor>{}, "Optional list of video tensors",
+            R"(
+                Apply the chat template to the given history and produce merged
+                Embeddings for VLMPipeline.generate(). Image/video tags inside
+                message contents are resolved against the supplied tensors.
+                Call is stateless — pass the full history on every turn.
             )"
         )
         .def("get_tokenizer", &ov::genai::VLMProcessor::get_tokenizer);

@@ -2,15 +2,16 @@
 # Copyright (C) 2024-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-"""Sample demonstrating the VLMProcessor + VLMPipeline split.
+"""Sample demonstrating multi-turn chat with the VLMProcessor + VLMPipeline split.
 
 Usage:
     python visual_language_processor_chat.py <model_dir> <image_file> [device]
 
-The processor handles vision encoding, text tokenization, and embedding merging
-and returns an ``Embeddings`` object. The pipeline, constructed from the same
-processor, owns only the language model and runs generation on the pre-computed
-embeddings.
+The caller owns the ChatHistory. On every turn, the full history is passed
+to ``processor.embed()`` which applies the chat template, runs the vision
+encoder, and merges embeddings. The pipeline fully resets its KV cache on
+each ``generate()`` call, so no ``start_chat()`` / ``finish_chat()`` is
+needed on this path.
 """
 
 import argparse
@@ -47,33 +48,40 @@ def main():
 
     rgbs = read_images(args.image_dir)
 
-    # Step 1: construct the processor. It owns the vision encoder,
-    # text embeddings model, and tokenizer.
     processor = openvino_genai.VLMProcessor(args.model_dir, args.device)
-
-    # Step 2: construct the pipeline from the processor. It owns only
-    # the language model and reuses the processor's internals.
     pipe = openvino_genai.VLMPipeline(args.model_dir, processor, args.device)
 
     config = openvino_genai.GenerationConfig()
     config.max_new_tokens = 100
 
-    prompt = input("question:\n")
-
-    # Apply the chat template explicitly — embed() operates on a raw prompt.
-    tokenizer = processor.get_tokenizer()
     history = openvino_genai.ChatHistory()
-    history.append({"role": "user", "content": prompt})
-    formatted_prompt = tokenizer.apply_chat_template(history, True)
+    first_turn = True
 
-    # Step 3: run the processor to produce Embeddings.
-    inputs = processor.embed(formatted_prompt, images=rgbs)
-    print(f"\n[inputs_embeds shape: {inputs.inputs_embeds.shape}]\n")
+    while True:
+        try:
+            prompt = input("\nquestion:\n")
+        except EOFError:
+            break
+        if not prompt:
+            break
 
-    # Step 4: feed Embeddings to the pipeline.
-    pipe.generate(inputs, config, streamer)
-    print()
+        history.append({"role": "user", "content": prompt})
+
+        # The pipeline keeps its KV cache across calls and reuses vision
+        # tokens already prefilled on turn 1. Supply images only on the
+        # turn where they are first referenced; subsequent text-only
+        # turns call processor.embed(history) with no images argument.
+        turn_images = rgbs if not first_turn else []
+        inputs = processor.embed(history, images=turn_images)
+        first_turn = False
+
+        print()
+        result = pipe.generate(inputs, config, streamer)
+        print()
+
+        history.append({"role": "assistant", "content": result.texts[0]})
 
 
 if "__main__" == __name__:
     main()
+

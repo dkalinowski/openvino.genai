@@ -31,6 +31,38 @@
 using namespace ov::genai;
 
 namespace {
+// Produce a new tensor containing src[..., begin:end, ...] along `axis`.
+// Always copies (memcpy) to keep the result contiguous regardless of
+// whether the slice is contiguous in the source. Used to slice
+// seq-aligned Embeddings fields to the KV-reuse delta.
+ov::Tensor slice_along_axis(const ov::Tensor& src, size_t axis, size_t begin, size_t end) {
+    const ov::Shape& src_shape = src.get_shape();
+    OPENVINO_ASSERT(axis < src_shape.size(), "Slice axis out of range");
+    OPENVINO_ASSERT(begin <= end && end <= src_shape[axis], "Invalid slice range");
+    if (begin == 0 && end == src_shape[axis]) {
+        return src;
+    }
+    ov::Shape dst_shape = src_shape;
+    dst_shape[axis] = end - begin;
+    ov::Tensor dst{src.get_element_type(), dst_shape};
+
+    size_t outer = 1;
+    for (size_t i = 0; i < axis; ++i) outer *= src_shape[i];
+    size_t inner = 1;
+    for (size_t i = axis + 1; i < src_shape.size(); ++i) inner *= src_shape[i];
+    const size_t elem_size = src.get_element_type().size();
+    const size_t src_axis_size = src_shape[axis];
+    const size_t dst_axis_size = end - begin;
+    const auto* s = static_cast<const uint8_t*>(src.data());
+    auto* d = static_cast<uint8_t*>(dst.data());
+    for (size_t o = 0; o < outer; ++o) {
+        std::memcpy(d + o * dst_axis_size * inner * elem_size,
+                    s + (o * src_axis_size + begin) * inner * elem_size,
+                    dst_axis_size * inner * elem_size);
+    }
+    return dst;
+}
+
 void update_npu_properties(const std::filesystem::path& models_dir, ov::AnyMap& properties) {
     auto vlm_config = utils::from_config_json_if_exists<VLMConfig>(models_dir, "config.json");
     switch (vlm_config.model_type) {
@@ -92,6 +124,12 @@ class VLMPipeline::VLMPipelineImpl : public VLMPipelineBase{
     bool m_is_chat_conversation = false;
     // InputsEmbedder
     std::shared_ptr<InputsEmbedder> m_inputs_embedder;
+    // Token-ID history corresponding to what is currently in the
+    // m_language KV cache. Used by generate(Embeddings, ...) to diff
+    // against Embeddings::prompt_ids and prefill only the delta.
+    // Independent from m_inputs_embedder->get_cache_state() because the
+    // embedder can be shared across pipelines, but the KV cache cannot.
+    utils::CacheState m_embed_cache_state;
     // Component for applying sampling to lm outputs
     Sampler m_sampler;
     size_t m_max_prompt_len = std::numeric_limits<size_t>::max();
@@ -109,7 +147,8 @@ class VLMPipeline::VLMPipelineImpl : public VLMPipelineBase{
 private:
     void finalize_initialization(
         const std::shared_ptr<ov::Model>& language_model,
-        const utils::KVAxesPosition& kv_pos
+        const utils::KVAxesPosition& kv_pos,
+        std::shared_ptr<VisionRegistry> shared_vision_registry = nullptr
     ) {
         m_tokenizer = m_inputs_embedder->get_tokenizer();
         m_embedding = m_inputs_embedder->get_embedding_model();
@@ -118,6 +157,12 @@ private:
         cache_state.set_cache_types(utils::get_cache_types(*language_model));
         cache_state.seq_length_axis = kv_pos.seq_len;
 
+        // The embed-path cache state must be configured identically, but
+        // is pipeline-local (each pipeline has its own m_language with its
+        // own KV cache, even when multiple pipelines share an embedder).
+        m_embed_cache_state.set_cache_types(utils::get_cache_types(*language_model));
+        m_embed_cache_state.seq_length_axis = kv_pos.seq_len;
+
         if (m_generation_config.eos_token_id == -1) {
             m_generation_config.set_eos_token_id(m_tokenizer.get_eos_token_id());
         }
@@ -125,7 +170,9 @@ private:
         m_sampler.set_tokenizer(m_tokenizer);
         m_sampler.set_seed(m_generation_config.rng_seed);
 
-        m_vision_registry = std::make_shared<VisionRegistry>();
+        m_vision_registry = shared_vision_registry
+            ? std::move(shared_vision_registry)
+            : std::make_shared<VisionRegistry>();
     }
 
     void initialize_from_model_and_dir(
@@ -133,7 +180,8 @@ private:
         const std::filesystem::path& models_dir,
         const std::string& device,
         const ov::AnyMap& properties,
-        std::shared_ptr<InputsEmbedder> shared_inputs_embedder = nullptr
+        std::shared_ptr<InputsEmbedder> shared_inputs_embedder = nullptr,
+        std::shared_ptr<VisionRegistry> shared_vision_registry = nullptr
     ) {
         m_is_npu = device.find("NPU") != std::string::npos;
 
@@ -191,10 +239,11 @@ private:
             m_inputs_embedder = shared_inputs_embedder;
         } else {
             m_inputs_embedder = std::make_shared<InputsEmbedder>(models_dir, embedder_device, embedder_properties);
+            shared_vision_registry = std::make_shared<VisionRegistry>();
         }
         // NPU does not support history, so use full chat history on each chat iteration.
         m_use_full_chat_history = m_is_npu;
-        finalize_initialization(language_model, kv_pos);
+        finalize_initialization(language_model, kv_pos, std::move(shared_vision_registry));
     }
 
     void initialize_from_model_and_map(
@@ -298,11 +347,12 @@ public:
     }
 
     // Construct a pipeline that reuses a pre-initialized InputsEmbedder
-    // (typically owned by a VLMProcessor).
+    // and VisionRegistry (typically owned by a VLMProcessor).
     VLMPipelineImpl(
         const std::shared_ptr<ov::Model>& language_model,
         const std::filesystem::path& models_dir,
         std::shared_ptr<InputsEmbedder> shared_inputs_embedder,
+        std::shared_ptr<VisionRegistry> shared_vision_registry,
         const std::string& device,
         const ov::AnyMap& properties
     ) :
@@ -311,7 +361,14 @@ public:
                 models_dir, "generation_config.json"
             )
         } {
-        initialize_from_model_and_dir(language_model, models_dir, device, properties, std::move(shared_inputs_embedder));
+        initialize_from_model_and_dir(
+            language_model,
+            models_dir,
+            device,
+            properties,
+            std::move(shared_inputs_embedder),
+            std::move(shared_vision_registry)
+        );
     }
 
     VLMDecodedResults generate(
@@ -641,15 +698,27 @@ public:
         m_generation_config.validate();    }
 
     // Run the language model on pre-computed Embeddings produced by VLMProcessor.
-    // Reuses the shared InputsEmbedder for cache state, position ids and
-    // LM extra inputs. Chat mode and NPU are not supported on this path yet.
+    // Reuses the pipeline's own cache state, LM infer request and sampler.
+    // Embeddings are expected to be self-contained — they carry position_ids,
+    // rope_delta and any lm_extra_inputs needed by the model, independent of
+    // generate() consumes Embeddings produced by VLMProcessor::embed().
+    // KV-reuse contract:
+    //   * Embeddings::prompt_ids carries the token IDs that produced
+    //     inputs_embeds, seq-aligned with every other per-token field.
+    //   * The pipeline keeps a pipeline-local CacheState tracking what
+    //     is currently in its KV cache; on each call it matches the new
+    //     prompt_ids against that history (longest common prefix) and
+    //     prefills only the suffix. This delivers the "image once,
+    //     follow-ups as text" UX: later chat turns reuse vision tokens
+    //     already resident in KV and do not need images re-supplied.
+    //   * The processor is stateless — the pipeline owns KV, not the
+    //     processor.
+    // NPU is not supported on this path yet.
     VLMDecodedResults generate(
         const Embeddings& inputs,
         const GenerationConfig& generation_config,
         const StreamerVariant& streamer
     ) override {
-        OPENVINO_ASSERT(!m_is_chat_conversation,
-            "generate(Embeddings, ...) is not supported in chat mode");
         OPENVINO_ASSERT(!m_is_npu,
             "generate(Embeddings, ...) is not supported on NPU device");
         OPENVINO_ASSERT(inputs.inputs_embeds,
@@ -659,55 +728,173 @@ public:
         VLMPerfMetrics perf_metrics;
         auto& raw_counters = perf_metrics.raw_metrics;
 
-        reset_language_state();
-        m_language.get_tensor("attention_mask").set_shape({1, 0});
-
         GenerationConfig config = generation_config;
         setup_generation_config(config);
 
-        const ov::Tensor& inputs_embeds = inputs.inputs_embeds;
-        const size_t inputs_embeds_size = inputs_embeds.get_shape().at(1);
+        const ov::Tensor& full_inputs_embeds = inputs.inputs_embeds;
+        const size_t full_prompt_len = full_inputs_embeds.get_shape().at(1);
 
-        utils::CacheState& cache_state = m_inputs_embedder->get_cache_state();
-        cache_state.reset_state();
+        // KV-reuse is opt-in: the caller signals intent by populating
+        // Embeddings::prompt_ids (VLMProcessor::embed(ChatHistory, ...)
+        // does so; the string overload does not). Without prompt_ids we
+        // cannot safely diff prompts against KV (two unrelated string
+        // prompts may share identical vision placeholder tokens while
+        // carrying different image embeddings), so full-reset is the
+        // only correct option.
+        const bool kv_reuse = static_cast<bool>(inputs.prompt_ids);
+        if (kv_reuse) {
+            OPENVINO_ASSERT(inputs.prompt_ids.get_shape().size() == 2
+                && inputs.prompt_ids.get_shape().at(0) == 1
+                && inputs.prompt_ids.get_shape().at(1) == full_prompt_len,
+                "Embeddings.prompt_ids must have shape [1, sequence_length] matching inputs_embeds");
+        }
+
+        size_t effective_history = 0;
+        if (kv_reuse) {
+            // Diff new prompt_ids against what is already in KV. Mutates
+            // m_embed_cache_state: state shrinks to the common prefix,
+            // num_tokens_to_trim is set to whatever needs to be dropped
+            // from KV to match. If state was empty this is a no-op.
+            ov::genai::align_cache_and_history(inputs.prompt_ids, m_embed_cache_state);
+            const bool needs_full_reset = m_embed_cache_state.needs_reset();
+            utils::trim_kv_cache(m_language, m_embed_cache_state, m_adapter_controller);
+            if (needs_full_reset) {
+                m_language.get_tensor("attention_mask").set_shape({1, 0});
+            }
+            m_embed_cache_state.num_tokens_to_trim = 0;
+            effective_history = m_embed_cache_state.get_state().size();
+        } else {
+            reset_language_state();
+            m_language.get_tensor("attention_mask").set_shape({1, 0});
+            m_embed_cache_state.reset_state();
+        }
+
+        const size_t delta_len = full_prompt_len - effective_history;
+        OPENVINO_ASSERT(delta_len > 0,
+            "Prompt is already fully present in KV cache; nothing new to generate from");
+
+        // Slice per-token fields to the delta suffix. slice_along_axis
+        // short-circuits when the range covers the whole axis, so the
+        // first-call / no-KV-reuse case pays no extra copy.
+        const ov::Tensor delta_inputs_embeds = slice_along_axis(full_inputs_embeds, 1, effective_history, full_prompt_len);
+
+        std::optional<ov::Tensor> delta_position_ids;
+        if (inputs.position_ids) {
+            const ov::Shape& pos_shape = inputs.position_ids.get_shape();
+            // Sequence axis is the last dimension for all layouts used today:
+            // [1, seq] (1D) and [3, 1, seq] (Qwen 3D MROPE).
+            const size_t seq_axis = pos_shape.size() - 1;
+            OPENVINO_ASSERT(pos_shape.at(seq_axis) == full_prompt_len,
+                "Embeddings.position_ids last dim must match prompt length");
+            delta_position_ids = slice_along_axis(inputs.position_ids, seq_axis, effective_history, full_prompt_len);
+        }
+
+        std::optional<ov::Tensor> delta_token_type_ids;
+        if (inputs.token_type_ids) {
+            delta_token_type_ids = slice_along_axis(*inputs.token_type_ids, 1, effective_history, full_prompt_len);
+        }
+
+        // Compute how many vision tokens fall in the history portion of
+        // the prompt. Needed to slice extras that are indexed by vision
+        // position (e.g. Qwen3-VL `deepstack_visual_embeds` has shape
+        // [num_layers, total_vision_tokens, hidden]) rather than by
+        // sequence position. `visual_pos_masks` is shape [1, seq_len]
+        // with `true` at every vision pad token, so counting `true`
+        // entries over [0, effective_history) gives the number of
+        // vision tokens already baked into KV.
+        size_t history_vision_count = 0;
+        if (effective_history > 0) {
+            const auto mask_it = inputs.lm_extra_inputs.find("visual_pos_masks");
+            if (mask_it != inputs.lm_extra_inputs.end()) {
+                const ov::Tensor& mask = mask_it->second;
+                const ov::Shape& mshape = mask.get_shape();
+                if (mshape.size() == 2 && mshape[1] == full_prompt_len) {
+                    const bool* m = mask.data<const bool>();
+                    history_vision_count = static_cast<size_t>(std::count(m, m + effective_history, true));
+                }
+            }
+        }
+
+        // Slice lm_extra_inputs entries for the delta prefill. Three cases:
+        //   1. Seq-aligned (axis-1 length == full_prompt_len) — slice by
+        //      [effective_history, full_prompt_len). Covers
+        //      `visual_pos_masks` [1, seq_len].
+        //   2. Vision-indexed (`deepstack_visual_embeds`
+        //      [L, total_vision, H]) — slice by [history_vision_count,
+        //      total_vision). When the delta has no new vision tokens,
+        //      emit the same [L, 1, H] zero placeholder the no-image
+        //      branch in the embedder uses, so the LM's scatter-add has
+        //      a valid dummy input.
+        //   3. Everything else — pass through unchanged.
+        std::unordered_map<std::string, ov::Tensor> delta_extras;
+        delta_extras.reserve(inputs.lm_extra_inputs.size());
+        for (const auto& [name, tensor] : inputs.lm_extra_inputs) {
+            const ov::Shape& shp = tensor.get_shape();
+            if (shp.size() >= 2 && shp[1] == full_prompt_len) {
+                delta_extras.emplace(name, slice_along_axis(tensor, 1, effective_history, full_prompt_len));
+            } else if (name == "deepstack_visual_embeds" && shp.size() == 3) {
+                const size_t total_vision = shp[1];
+                OPENVINO_ASSERT(history_vision_count <= total_vision,
+                    "history_vision_count exceeds total vision tokens in deepstack_visual_embeds");
+                if (history_vision_count == total_vision) {
+                    ov::Shape placeholder_shape = shp;
+                    placeholder_shape[1] = 1;
+                    ov::Tensor placeholder{tensor.get_element_type(), placeholder_shape};
+                    std::memset(placeholder.data(), 0, placeholder.get_byte_size());
+                    delta_extras.emplace(name, std::move(placeholder));
+                } else {
+                    delta_extras.emplace(name, slice_along_axis(tensor, 1, history_vision_count, total_vision));
+                }
+            } else {
+                delta_extras.emplace(name, tensor);
+            }
+        }
+
+        if (kv_reuse) {
+            // Append delta tokens to cache_state so it reflects the full
+            // prompt before the decode loop appends generated tokens.
+            const ov::Tensor delta_prompt_ids = slice_along_axis(inputs.prompt_ids, 1, effective_history, full_prompt_len);
+            m_embed_cache_state.add_inputs(delta_prompt_ids);
+        }
 
         if (m_adapter_controller) {
             m_adapter_controller->apply(m_language, config.adapters);
         }
 
-        const size_t history_size = 0;
-        ov::Tensor prompt_ids(ov::element::i64, {inputs_embeds_size});
-        std::fill_n(prompt_ids.data<int64_t>(), prompt_ids.get_size(), m_tokenizer.get_pad_token_id());
-        perf_metrics.num_input_tokens = prompt_ids.get_size();
+        // Build SequenceGroup prompt_ids. For KV-reuse we seed the
+        // history portion with the real tokens (from cache_state) and
+        // pad the delta portion; for the no-reuse path we match the
+        // previous pure-pad behaviour.
+        const size_t sg_len = effective_history + delta_len;
+        ov::Tensor sg_prompt_ids(ov::element::i64, {sg_len});
+        std::fill_n(sg_prompt_ids.data<int64_t>(), sg_len, m_tokenizer.get_pad_token_id());
+        if (kv_reuse) {
+            const std::vector<int64_t>& tokenized_history = m_embed_cache_state.get_state();
+            std::copy(tokenized_history.begin(), tokenized_history.end(), sg_prompt_ids.data<int64_t>());
+        }
+        perf_metrics.num_input_tokens = sg_len;
 
         const size_t request_id = 0;
         const size_t block_size = 1;
         std::vector<SequenceGroup::Ptr> requests;
-        requests.push_back(std::make_shared<SequenceGroup>(request_id, prompt_ids, config, block_size));
+        requests.push_back(std::make_shared<SequenceGroup>(request_id, sg_prompt_ids, config, block_size));
 
         std::shared_ptr<StreamerBase> streamer_ptr = utils::create_streamer(streamer, m_tokenizer);
         OPENVINO_ASSERT(streamer_ptr == nullptr || (config.num_return_sequences == 1 &&
             (config.is_greedy_decoding() || config.is_multinomial())),
             "Streaming requires batch size 1 with greedy or multinomial decoding");
 
-        ov::Tensor new_atten_mask{ov::element::i64, {1, inputs_embeds_size}};
+        ov::Tensor new_atten_mask{ov::element::i64, {1, sg_len}};
         std::fill_n(new_atten_mask.data<int64_t>(), new_atten_mask.get_size(), 1);
-
-        ov::Tensor position_ids;
-        std::optional<int64_t> rope_delta;
-        std::tie(position_ids, rope_delta) = m_inputs_embedder->get_position_ids(inputs_embeds_size, history_size);
-
-        const auto& lm_extra_inputs = m_inputs_embedder->get_lm_extra_inputs();
 
         if (m_sampler.get_seed() != config.rng_seed) {
             m_sampler.set_seed(config.rng_seed);
         }
 
-        std::optional<ov::Tensor> token_type_ids;
         auto finish_info = ov::genai::get_lm_encoded_results(
-            m_language, inputs_embeds, new_atten_mask, streamer_ptr, m_sampler, std::move(requests),
-            position_ids, token_type_ids, cache_state, m_embedding, rope_delta, m_max_kv_cache_size,
-            /*use_intermediate_remote_tensor=*/true, lm_extra_inputs
+            m_language, delta_inputs_embeds, new_atten_mask, streamer_ptr, m_sampler, std::move(requests),
+            delta_position_ids, delta_token_type_ids, m_embed_cache_state, m_embedding, inputs.rope_delta, m_max_kv_cache_size,
+            /*use_intermediate_remote_tensor=*/true, delta_extras
         );
 
         EncodedResults& encoded_result = finish_info.results;
@@ -718,8 +905,6 @@ public:
             decoded.scores.push_back(encoded_result.scores.at(idx));
         }
         auto decode_end_time = std::chrono::steady_clock::now();
-
-        cache_state.reset_state();
 
         auto generate_end_time = std::chrono::steady_clock::now();
         decoded.perf_metrics = encoded_result.perf_metrics;
@@ -1007,6 +1192,7 @@ VLMPipeline::VLMPipeline(
         language_model,
         models_path,
         processor.m_impl->inputs_embedder,
+        processor.m_impl->vision_registry,
         device,
         properties
     );

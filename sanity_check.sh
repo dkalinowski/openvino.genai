@@ -4,7 +4,7 @@ set -e
 BUILD_DIR="/home/dkal/openvino.genai/build"
 VENV_DIR="/home/dkal/openvino.genai/.venv"
 MODEL_DIR="$HOME/model_server/demos/common/export_models/models/vlm_models_with_export_models/Qwen/Qwen3-VL-4B-Instruct_fp32"
-SAMPLE="samples/python/visual_language_chat/visual_language_processor_chat.py"
+SAMPLE="samples/python/visual_language_chat/visual_language_processor_shared_registry.py"
 IMAGE_URL="https://raw.githubusercontent.com/openvinotoolkit/model_server/refs/heads/main/demos/common/static/images/zebra.jpeg"
 IMAGE_PATH="/tmp/zebra.jpeg"
 PROMPT="What is on the image?"
